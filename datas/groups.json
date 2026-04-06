@@ -1,0 +1,83 @@
+[
+  {
+    "id": "g001",
+    "title": "Vacation",
+    "subtitle": "Shopping of Clothing & Accessories in Pheonix Mall",
+    "amount": "+₹45.60",
+    "isPositive": true,
+    "date": "02/01/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=10",
+    "memberIds": ["u001", "u002", "u003"]
+  },
+  {
+    "id": "g002",
+    "title": "Shopping",
+    "subtitle": "Shopping of Clothing & Accessories in Pheonix Mall",
+    "amount": "-₹24.40",
+    "isPositive": false,
+    "date": "12/10/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=20",
+    "memberIds": ["u004", "u005", "u006"]
+  },
+  {
+    "id": "g003",
+    "title": "Roommates",
+    "subtitle": "Monthly flat sharing expenses",
+    "amount": "-₹50.40",
+    "isPositive": false,
+    "date": "01/11/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=30",
+    "memberIds": ["u001", "u007"]
+  },
+  {
+    "id": "g004",
+    "title": "Restaurant",
+    "subtitle": "Dinner split at Barbeque Nation",
+    "amount": "+₹28.00",
+    "isPositive": true,
+    "date": "05/11/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=40",
+    "memberIds": ["u002", "u003", "u005", "u008"]
+  },
+  {
+    "id": "g005",
+    "title": "Vacation",
+    "subtitle": "Shopping of Clothing & Accessories in Pheonix Mall",
+    "amount": "+₹45.60",
+    "isPositive": true,
+    "date": "02/01/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=10",
+    "memberIds": ["u001", "u002", "u003"]
+  },
+  {
+    "id": "g006",
+    "title": "Shopping",
+    "subtitle": "Shopping of Clothing & Accessories in Pheonix Mall",
+    "amount": "-₹24.40",
+    "isPositive": false,
+    "date": "12/10/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=20",
+    "memberIds": ["u004", "u005", "u006"]
+  },
+  {
+    "id": "g007",
+    "title": "Roommates",
+    "subtitle": "Monthly flat sharing expenses",
+    "amount": "-₹50.40",
+    "isPositive": false,
+    "date": "01/11/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=30",
+    "memberIds": ["u001", "u007"]
+  },
+  {
+    "id": "g008",
+    "title": "Restaurant",
+    "subtitle": "Dinner split at Barbeque Nation",
+    "amount": "+₹28.00",
+    "isPositive": true,
+    "date": "05/11/2025",
+    "coverImage": "https://i.pravatar.cc/400?img=40",
+    "memberIds": ["u002", "u003", "u005", "u008"]
+  }
+]
+
