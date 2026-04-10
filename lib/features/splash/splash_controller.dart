@@ -1,6 +1,7 @@
-// import 'dart:async';
 // import 'package:flutter/material.dart';
-// import 'package:splitzon/features/onboarding/onboarding_screen.dart';
+// import 'package:provider/provider.dart';
+// import 'package:splitzon/provider/user_providers.dart';
+// import 'package:splitzon/providers/group_provider.dart';
 
 // class SplashController {
 //   late AnimationController animationController;
@@ -24,16 +25,29 @@
 
 //     animationController.forward();
 
-//     _navigateToOnboarding(context);
+//     _checkAuthAndNavigate(context);
 //   }
 
-//   Future<void> _navigateToOnboarding(BuildContext context) async {
+//   Future<void> _checkAuthAndNavigate(BuildContext context) async {
 //     await Future.delayed(const Duration(milliseconds: 2500));
 
-//     if (context.mounted) {
-//       Navigator.pushReplacement(
+//     if (!context.mounted) return;
+
+//     final userProvider = Provider.of<UserProviders>(context, listen: false);
+//     final groupProvider = Provider.of<GroupProvider>(context, listen: false); // ✅ NEW
+
+//     // ✅ Pass groupProvider so token + userId are pushed to it on restore
+//     final isLoggedIn = await userProvider.initAuth(groupProvider);
+
+//     if (!context.mounted) return;
+
+//     if (isLoggedIn) {
+//       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+//     } else {
+//       Navigator.pushNamedAndRemoveUntil(
 //         context,
-//         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+//         '/onboarding',
+//         (route) => false,
 //       );
 //     }
 //   }
@@ -46,6 +60,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:splitzon/provider/user_providers.dart';
+import 'package:splitzon/providers/group_provider.dart';
+import 'package:splitzon/services/connectivity_service.dart';
 
 class SplashController {
   late AnimationController animationController;
@@ -68,28 +84,43 @@ class SplashController {
     );
 
     animationController.forward();
-
-    // ✅ Check auth while animation plays
     _checkAuthAndNavigate(context);
   }
 
   Future<void> _checkAuthAndNavigate(BuildContext context) async {
-    // Wait for splash animation to complete
     await Future.delayed(const Duration(milliseconds: 2500));
 
     if (!context.mounted) return;
 
-    // ✅ Check SharedPreferences for saved session
-    final provider = Provider.of<UserProviders>(context, listen: false);
-    final isLoggedIn = await provider.initAuth();
+    final userProvider = Provider.of<UserProviders>(context, listen: false);
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+
+    final isLoggedIn = await userProvider.initAuth(groupProvider);
 
     if (!context.mounted) return;
 
     if (isLoggedIn) {
-      // ✅ User session found → skip login → go home
+      // ✅ PRINT USER DETAILS
+
+    print("========== USER SESSION ==========");
+
+    print("User ID: ${userProvider.user?.id}");
+    print("Name: ${userProvider.user?.name}");
+    print("Email: ${userProvider.user?.email}");
+    print("Phone: ${userProvider.user?.phone}");
+
+    // If token is stored decrypted in memory
+    print("Token (decrypted): ${userProvider.token}");
+
+    print("Is Logged In: $isLoggedIn");
+
+    print("==================================");
+      // ✅ Session restored — restart connectivity watcher
+      // so any groups created offline while app was closed also get synced
+      ConnectivityService.instance.startWatching(groupProvider);
+
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } else {
-      // ❌ No session → go to onboarding as usual
       Navigator.pushNamedAndRemoveUntil(
         context,
         '/onboarding',

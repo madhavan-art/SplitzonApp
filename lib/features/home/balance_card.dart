@@ -8,8 +8,8 @@ class BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ✅ Assign values here
-    final double youOwe = 340.00;
-    final double youAreOwed = 1250.00;
+    final double youOwe = 0.00;
+    final double youAreOwed = 0.00;
 
     // ✅ Auto-calculated
     final double totalBalance = youAreOwed - youOwe;

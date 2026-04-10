@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:splitzon/provider/user_providers.dart';
+import 'package:splitzon/providers/group_provider.dart';
 import 'services/firebase_options.dart';
 
 void main() async {
@@ -17,11 +18,13 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => UserProviders())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProviders()),
+        ChangeNotifierProvider(create: (_) => GroupProvider()),
+      ],
       child: const MyApp(),
     ),
   );
-  // runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {

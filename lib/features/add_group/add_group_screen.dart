@@ -2,20 +2,20 @@
 // FILE: lib/features/add_group/add_group_screen.dart
 // ════════════════════════════════════════════════════════════════
 //
-//  TEXT COLOR RULES (matches home_screen.dart):
-//  • Section titles  (Group Type, Group Details…) → AppColors.primary
-//  • Card/field titles                             → AppColors.textPrimary
-//  • Subtitles / hints / secondary text           → AppColors.textSecondary
+//  Dynamic version using Provider + SQLite
+//  - All UI preserved from original design
+//  - Data saved via GroupProvider to SQLite
+//  - Members stored as list of names (no static people.json)
 //
 // ════════════════════════════════════════════════════════════════
 
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/core/utils/background_main_theme.dart';
+import 'package:splitzon/providers/group_provider.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CURRENCY DATA
@@ -70,28 +70,21 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
   final _shareCtrl = TextEditingController();
   final _budgetCtrl = TextEditingController();
 
-  List<Map<String, dynamic>> _allPeople = [];
-  final List<Map<String, dynamic>> _selected = [];
+  final List<String> _members = [];
+  final _memberNameCtrl = TextEditingController();
   bool _isSaving = false;
-  bool _isPeopleLoading = true;
   String _selectedType = 'Other';
   File? _pickedImage;
   _Currency _currency = _kCurrencies.first;
 
   static const _types = [
-    {'label': 'Trip', 'icon': Icons.flight_takeoff_rounded, 'img': 'img=50'},
-    {'label': 'Food', 'icon': Icons.restaurant_rounded, 'img': 'img=40'},
-    {'label': 'Home', 'icon': Icons.home_rounded, 'img': 'img=30'},
-    {'label': 'Office', 'icon': Icons.work_rounded, 'img': 'img=60'},
-    {'label': 'Shopping', 'icon': Icons.shopping_bag_rounded, 'img': 'img=20'},
-    {'label': 'Other', 'icon': Icons.category_rounded, 'img': 'img=10'},
+    {'label': 'Trip', 'icon': Icons.flight_takeoff_rounded},
+    {'label': 'Food', 'icon': Icons.restaurant_rounded},
+    {'label': 'Home', 'icon': Icons.home_rounded},
+    {'label': 'Office', 'icon': Icons.work_rounded},
+    {'label': 'Shopping', 'icon': Icons.shopping_bag_rounded},
+    {'label': 'Other', 'icon': Icons.category_rounded},
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPeople();
-  }
 
   @override
   void dispose() {
@@ -99,21 +92,8 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
     _subtitleCtrl.dispose();
     _shareCtrl.dispose();
     _budgetCtrl.dispose();
+    _memberNameCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadPeople() async {
-    try {
-      final raw = await rootBundle.loadString('datas/people.json');
-      final list = jsonDecode(raw) as List;
-      setState(() {
-        _allPeople = list.map((e) => Map<String, dynamic>.from(e)).toList();
-        _isPeopleLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ load people: $e');
-      setState(() => _isPeopleLoading = false);
-    }
   }
 
   Future<void> _pickImage() async {
@@ -147,55 +127,34 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selected.isEmpty) {
-      _snack('Please select at least one member.', Colors.red);
+    if (_members.isEmpty) {
+      _snack('Please add at least one member.', Colors.red);
       return;
     }
+
     setState(() => _isSaving = true);
     try {
-      final raw = await rootBundle.loadString('datas/groups.json');
-      final existing = jsonDecode(raw) as List;
-      final newId = 'g${(existing.length + 1).toString().padLeft(3, '0')}';
-
-      final imgParam =
-          (_types.firstWhere(
-                (t) => t['label'] == _selectedType,
-                orElse: () => _types.last,
-              )['img'])
-              as String;
-
-      final budget = double.tryParse(_budgetCtrl.text.trim()) ?? 0.0;
-      final share = double.tryParse(_shareCtrl.text.trim()) ?? 0.0;
-
-      final newGroup = <String, dynamic>{
-        'id': newId,
-        'title': _titleCtrl.text.trim(),
-        'subtitle': _subtitleCtrl.text.trim(),
-        'amount': '${_currency.symbol}${budget.toStringAsFixed(2)}',
-        'isPositive': true,
-        'date': _fmtDate(DateTime.now()),
-        'coverImage':
-            _pickedImage?.path ?? 'https://i.pravatar.cc/400?$imgParam',
-        'memberIds': _selected.map((m) => m['id'] as String).toList(),
-        'type': _selectedType,
-        'currency': _currency.code,
-        'budget': budget,
-        'share': share,
-      };
+      // Create group via Provider (saves to SQLite)
+      await context.read<GroupProvider>().createGroup(
+        name: _titleCtrl.text.trim(),
+        description: _subtitleCtrl.text.trim(),
+        groupType: _selectedType,
+        currency: _currency.code,
+        overallBudget: double.tryParse(_budgetCtrl.text.trim()) ?? 0.0,
+        myShare: double.tryParse(_shareCtrl.text.trim()) ?? 0.0,
+        members: _members,
+        bannerImagePath: _pickedImage?.path,
+      );
 
       setState(() => _isSaving = false);
       if (!mounted) return;
-      Navigator.pop(context, newGroup);
+      _snack('Group created successfully!', Colors.green);
+      Navigator.pop(context);
     } catch (e) {
       setState(() => _isSaving = false);
       _snack('Failed to create group. Try again.', Colors.red);
     }
   }
-
-  String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/'
-      '${d.year}';
 
   void _snack(String msg, Color color) {
     if (!mounted) return;
@@ -210,17 +169,24 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
     );
   }
 
-  void _toggle(Map<String, dynamic> person) {
+  void _addMember() {
+    final name = _memberNameCtrl.text.trim();
+    if (name.isEmpty) return;
+    if (_members.contains(name)) {
+      _snack('Member already added.', Colors.orange);
+      return;
+    }
     setState(() {
-      final idx = _selected.indexWhere((m) => m['id'] == person['id']);
-      if (idx >= 0)
-        _selected.removeAt(idx);
-      else
-        _selected.add(person);
+      _members.add(name);
+      _memberNameCtrl.clear();
     });
   }
 
-  bool _isSel(String id) => _selected.any((m) => m['id'] == id);
+  void _removeMember(String member) {
+    setState(() {
+      _members.remove(member);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,11 +201,10 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: _BackBtn(),
-        // "Create Group" title matches home screen header style
         title: const Text(
           'Create Group',
           style: TextStyle(
-            color: AppColors.primary, // ← same blue as "Splitzon" on home
+            color: AppColors.primary,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
@@ -254,8 +219,8 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${_selected.length} members',
-              style: const TextStyle(
+              '${_members.length} members',
+              style:  TextStyle(
                 fontSize: 11,
                 color: AppColors.primary,
                 fontWeight: FontWeight.w600,
@@ -379,9 +344,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                               boxShadow: active
                                   ? [
                                       BoxShadow(
-                                        color: AppColors.primary.withOpacity(
-                                          .3,
-                                        ),
+                                        color: AppColors.primary.withOpacity(.3),
                                         blurRadius: 8,
                                         offset: const Offset(0, 3),
                                       ),
@@ -399,9 +362,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                               children: [
                                 Icon(
                                   icon,
-                                  color: active
-                                      ? Colors.white
-                                      : AppColors.primary,
+                                  color: active ? Colors.white : AppColors.primary,
                                   size: 26,
                                 ),
                                 const SizedBox(height: 6),
@@ -410,10 +371,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
-                                    // active → white, inactive → textPrimary
-                                    color: active
-                                        ? Colors.white
-                                        : AppColors.textPrimary,
+                                    color: active ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -438,7 +396,6 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                         controller: _titleCtrl,
                         hint: 'e.g. Goa Trip, Office Lunch…',
                         label: 'Group Name',
-
                         icon: Icons.group_rounded,
                         validator: (v) => v == null || v.trim().isEmpty
                             ? 'Group name is required'
@@ -511,9 +468,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                             onTap: _openCurrencyPicker,
                             child: Container(
                               height: 50,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
                                 color: AppColors.primary.withOpacity(.08),
                                 borderRadius: BorderRadius.circular(12),
@@ -537,10 +492,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: _shareCtrl,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
                               style: TextStyle(
                                 fontSize: 15,
                                 color: AppColors.textSecondary,
@@ -571,9 +525,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.shade200,
-                                  ),
+                                  borderSide: BorderSide(color: Colors.grey.shade200),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -584,17 +536,11 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                 ),
                                 errorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Colors.red,
-                                    width: 1.2,
-                                  ),
+                                  borderSide: const BorderSide(color: Colors.red),
                                 ),
                                 focusedErrorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Colors.red,
-                                    width: 1.5,
-                                  ),
+                                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
                                 ),
                               ),
                             ),
@@ -608,11 +554,11 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                 const SizedBox(height: 16),
 
                 // ╔══════════════════════════════╗
-                // ║  5. MEMBERS                    ║
+                // ║  5. ADD MEMBERS                ║
                 // ╚══════════════════════════════╝
                 _SectionCard(
                   title: 'Add Members',
-                  trailing: _selected.isNotEmpty
+                  trailing: _members.isNotEmpty
                       ? Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -623,8 +569,8 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_selected.length} selected',
-                            style: const TextStyle(
+                            '${_members.length} added',
+                            style:  TextStyle(
                               fontSize: 11,
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600,
@@ -634,177 +580,97 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                       : null,
                   child: Column(
                     children: [
-                      // Selected avatars strip
-                      if (_selected.isNotEmpty) ...[
-                        SizedBox(
-                          height: 52,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _selected.length,
-                            itemBuilder: (_, i) {
-                              final m = _selected[i];
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppColors.primary,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: CircleAvatar(
-                                        radius: 22,
-                                        backgroundImage: NetworkImage(
-                                          m['avatar'],
-                                        ),
-                                        backgroundColor: Colors.grey.shade200,
-                                      ),
-                                    ),
-                                    Positioned(
-                                      right: -2,
-                                      top: -2,
-                                      child: GestureDetector(
-                                        onTap: () => _toggle(m),
-                                        child: Container(
-                                          width: 18,
-                                          height: 18,
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.shade500,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.white,
-                                              width: 1.5,
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.close,
-                                            size: 10,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                      // Input row for adding members
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _memberNameCtrl,
+                              style:  TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Enter member name',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade400,
+                                  fontSize: 13,
                                 ),
-                              );
-                            },
-                          ),
-                        ),
-                        Divider(height: 20, color: Colors.grey.shade100),
-                      ],
-
-                      // People list
-                      if (_isPeopleLoading)
-                        const Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _allPeople.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            color: Colors.grey.shade100,
-                            indent: 64,
-                          ),
-                          itemBuilder: (_, i) {
-                            final p = _allPeople[i];
-                            final sel = _isSel(p['id']);
-                            return Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () => _toggle(p),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 4,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 24,
-                                        backgroundImage: NetworkImage(
-                                          p['avatar'],
-                                        ),
-                                        backgroundColor: Colors.grey.shade100,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p['name'],
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 14,
-                                                color: AppColors
-                                                    .textPrimary, // ← name
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              p['phone'],
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: AppColors
-                                                    .textSecondary, // ← phone
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        width: 30,
-                                        height: 30,
-                                        decoration: BoxDecoration(
-                                          color: sel
-                                              ? AppColors.primary
-                                              : Colors.grey.shade100,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: sel
-                                                ? AppColors.primary
-                                                : Colors.grey.shade300,
-                                            width: 1.5,
-                                          ),
-                                          boxShadow: sel
-                                              ? [
-                                                  BoxShadow(
-                                                    color: AppColors.primary
-                                                        .withOpacity(.25),
-                                                    blurRadius: 6,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ]
-                                              : [],
-                                        ),
-                                        child: Icon(
-                                          sel ? Icons.check : Icons.add,
-                                          size: 16,
-                                          color: sel
-                                              ? Colors.white
-                                              : Colors.grey.shade400,
-                                        ),
-                                      ),
-                                    ],
+                                filled: true,
+                                fillColor: const Color(0xFFF5F9FF),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.primary,
+                                    width: 1.5,
                                   ),
                                 ),
                               ),
+                              onFieldSubmitted: (_) => _addMember(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _addMember,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: const Icon(Icons.add, size: 20),
+                          ),
+                        ],
+                      ),
+
+                      // Selected members chips
+                      if (_members.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _members.map((member) {
+                            return Chip(
+                              avatar: CircleAvatar(
+                                backgroundColor: AppColors.primary.withOpacity(.2),
+                                child: Text(
+                                  member[0].toUpperCase(),
+                                  style:  TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              label: Text(
+                                member,
+                                style:  TextStyle(fontSize: 12),
+                              ),
+                              deleteIcon: const Icon(Icons.close, size: 16),
+                              onDeleted: () => _removeMember(member),
+                              backgroundColor: Colors.white,
+                              deleteIconColor: Colors.red.shade400,
                             );
-                          },
+                          }).toList(),
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -885,7 +751,7 @@ class _BudgetHero extends StatelessWidget {
                               )
                             : const DecorationImage(
                                 image: NetworkImage(
-                                  'https://i.pravatar.cc/200?img=10',
+                                  '',
                                 ),
                                 fit: BoxFit.cover,
                               ),
@@ -920,7 +786,6 @@ class _BudgetHero extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // "OVERALL BUDGET" label → primary (like section titles)
                     const Text(
                       'OVERALL BUDGET',
                       style: TextStyle(
@@ -931,7 +796,6 @@ class _BudgetHero extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    // subtitle line → textSecondary
                     Text(
                       'Total cost for this group / trip',
                       style: TextStyle(
@@ -972,7 +836,6 @@ class _BudgetHero extends StatelessWidget {
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
-                            // budget number → textPrimary
                             style: TextStyle(
                               fontSize: sw < 360 ? 26 : 32,
                               fontWeight: FontWeight.w900,
@@ -1035,16 +898,14 @@ class _BudgetHero extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // currency code + name → textPrimary
                       Text(
                         '${currency.code}  •  ${currency.name}',
-                        style: const TextStyle(
+                        style:  TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      // helper line → textSecondary
                       Text(
                         'All amounts in this group use ${currency.code}',
                         style: TextStyle(
@@ -1157,7 +1018,6 @@ class _CurrencySheetState extends State<_CurrencySheet> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Select Currency',
-                // sheet title → primary (matches section titles)
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
@@ -1219,7 +1079,6 @@ class _CurrencySheetState extends State<_CurrencySheet> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                      // active → primary, inactive → textPrimary
                       color: active ? AppColors.primary : AppColors.textPrimary,
                     ),
                   ),
@@ -1227,7 +1086,6 @@ class _CurrencySheetState extends State<_CurrencySheet> {
                     c.symbol,
                     style: TextStyle(
                       fontSize: 12,
-                      // active → primary tint, inactive → textSecondary
                       color: active
                           ? AppColors.primary.withOpacity(.7)
                           : AppColors.textSecondary,
@@ -1261,16 +1119,10 @@ class _BackBtn extends StatelessWidget {
     onTap: () => Navigator.pop(context),
     child: Container(
       margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.primary.withOpacity(.1),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: const Icon(
         Icons.arrow_back_ios_new_rounded,
@@ -1281,7 +1133,6 @@ class _BackBtn extends StatelessWidget {
   );
 }
 
-// _SectionCard — title uses AppColors.primary (same as "Groups", "Quick Insights" on home)
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -1289,53 +1140,50 @@ class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.title, required this.child, this.trailing});
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16, // matches "Groups" / "Quick Insights" on home
-              fontWeight: FontWeight.bold,
-              color:
-                  AppColors.primary, // ← PRIMARY (blue), same as home sections
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(.85),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style:  TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                letterSpacing: 0.5,
+              ),
             ),
-          ),
-          if (trailing != null) trailing!,
-        ],
-      ),
-      const SizedBox(height: 10),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
+            if (trailing != null) trailing!,
           ],
         ),
-        child: child,
-      ),
-    ],
+        const SizedBox(height: 14),
+        child,
+      ],
+    ),
   );
 }
 
-// _Field — label uses textSecondary, typed text uses textPrimary
 class _Field extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final String label;
   final IconData icon;
   final String? Function(String?)? validator;
-  final TextInputType? keyboardType;
   final int maxLines;
   final int minLines;
 
@@ -1345,7 +1193,6 @@ class _Field extends StatelessWidget {
     required this.label,
     required this.icon,
     this.validator,
-    this.keyboardType,
     this.maxLines = 1,
     this.minLines = 1,
   });
@@ -1356,22 +1203,19 @@ class _Field extends StatelessWidget {
     children: [
       Text(
         label,
-        style: TextStyle(
+        style:  TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary, // ← field label = secondary
-          letterSpacing: 0.3,
+          color: AppColors.textPrimary,
         ),
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
       TextFormField(
         controller: controller,
         validator: validator,
-        keyboardType: keyboardType,
         maxLines: maxLines,
         minLines: minLines,
-        // typed text → textPrimary
-        style: TextStyle(
+        style:  TextStyle(
           fontSize: 14,
           color: AppColors.textSecondary,
           fontWeight: FontWeight.w500,
@@ -1379,25 +1223,15 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
-            color: AppColors.textSecondary.withOpacity(.5),
+            color: Colors.grey.shade400,
             fontSize: 13,
           ),
-          prefixIcon: Padding(
-            padding: EdgeInsets.only(top: maxLines > 1 ? 14 : 0),
-            child: Align(
-              alignment: maxLines > 1 ? Alignment.topCenter : Alignment.center,
-              widthFactor: 1.0,
-              heightFactor: maxLines > 1 ? 1.0 : null,
-              child: Icon(icon, color: AppColors.primary, size: 20),
-            ),
-          ),
+          prefixIcon: Icon(icon, size: 18, color: AppColors.primary),
           filled: true,
           fillColor: const Color(0xFFF5F9FF),
-          contentPadding: EdgeInsets.fromLTRB(
-            16,
-            maxLines > 1 ? 14 : 13,
-            16,
-            maxLines > 1 ? 14 : 13,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -1409,11 +1243,14 @@ class _Field extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 1.5,
+            ),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 1.2),
+            borderSide: const BorderSide(color: Colors.red),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),

@@ -6,6 +6,8 @@ import 'package:splitzon/core/utils/otp_screen.dart';
 import 'package:splitzon/core/utils/otp_screen_login.dart';
 import 'package:splitzon/core/widgets/show_snack_bar.dart';
 import 'package:splitzon/provider/user_providers.dart';
+import 'package:splitzon/providers/group_provider.dart';
+import 'package:splitzon/services/connectivity_service.dart';
 
 class FirebaseAuthMethods {
   final FirebaseAuth _auth;
@@ -49,7 +51,7 @@ class FirebaseAuthMethods {
     }
   }
 
-  /// SEND OTP (LOGIN) ← this was missing!
+  /// SEND OTP (LOGIN)
   Future<void> sendOtpLogin({
     required BuildContext context,
     required String phone,
@@ -99,9 +101,8 @@ class FirebaseAuthMethods {
         smsCode: otp,
       );
 
-      UserCredential userCredential = await _auth.signInWithCredential(
-        credential,
-      );
+      UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
       User? user = userCredential.user;
 
       if (user == null) {
@@ -116,17 +117,27 @@ class FirebaseAuthMethods {
         firebaseUid: user.uid,
       );
 
-      print("📦 Signup Response: $res");
+      debugPrint("📦 Signup Response: $res");
 
       if (res["success"] == true) {
         if (context.mounted) {
-          await Provider.of<UserProviders>(
-            context,
-            listen: false,
-          ).setAuthenticated(res["user"]);
+          final userProvider =
+              Provider.of<UserProviders>(context, listen: false);
+          final groupProvider =
+              Provider.of<GroupProvider>(context, listen: false);
+
+          await userProvider.setAuthenticated(
+            res["user"],
+            res["token"],
+            groupProvider,
+          );
+
+          // ✅ Start watching connectivity after login
+          ConnectivityService.instance.startWatching(groupProvider);
 
           showSnackBar(context, "Account Created!");
-          Navigator.pushNamedAndRemoveUntil(context, "/home", (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+              context, "/home", (route) => false);
         }
       } else {
         if (context.mounted) {
@@ -134,7 +145,7 @@ class FirebaseAuthMethods {
         }
       }
     } catch (e) {
-      print("🔥 OTP Error: $e");
+      debugPrint("🔥 OTP Error: $e");
       if (context.mounted) showSnackBar(context, e.toString());
     }
   }
@@ -153,9 +164,8 @@ class FirebaseAuthMethods {
         smsCode: otp,
       );
 
-      UserCredential userCredential = await _auth.signInWithCredential(
-        credential,
-      );
+      UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
       User? user = userCredential.user;
 
       if (user == null) {
@@ -165,16 +175,26 @@ class FirebaseAuthMethods {
 
       final res = await ApiService.loginComplete(firebaseUid: user.uid);
 
-      print("📦 Login Response: $res");
+      debugPrint("📦 Login Response: $res");
 
       if (res["success"] == true) {
         if (context.mounted) {
-          await Provider.of<UserProviders>(
-            context,
-            listen: false,
-          ).setAuthenticated(res["user"]);
+          final userProvider =
+              Provider.of<UserProviders>(context, listen: false);
+          final groupProvider =
+              Provider.of<GroupProvider>(context, listen: false);
 
-          Navigator.pushNamedAndRemoveUntil(context, "/home", (route) => false);
+          await userProvider.setAuthenticated(
+            res["user"],
+            res["token"],
+            groupProvider,
+          );
+
+          // ✅ Start watching connectivity after login
+          ConnectivityService.instance.startWatching(groupProvider);
+
+          Navigator.pushNamedAndRemoveUntil(
+              context, "/home", (route) => false);
         }
       } else {
         if (context.mounted) {
@@ -182,34 +202,44 @@ class FirebaseAuthMethods {
         }
       }
     } catch (e) {
-      print("🔥 Login OTP Error: $e");
+      debugPrint("🔥 Login OTP Error: $e");
       if (context.mounted) showSnackBar(context, e.toString());
     }
   }
 
   /// LOGOUT
   Future<void> signOut(BuildContext context) async {
-    await Provider.of<UserProviders>(context, listen: false).logout();
+    final groupProvider =
+        Provider.of<GroupProvider>(context, listen: false);
+
+    // ✅ Stop watching connectivity on logout
+    ConnectivityService.instance.stopWatching();
+
+    await Provider.of<UserProviders>(context, listen: false)
+        .logout(groupProvider);
+
     if (context.mounted) {
       Navigator.pushNamedAndRemoveUntil(context, "/", (route) => false);
     }
   }
 }
+
+
 // import 'package:firebase_auth/firebase_auth.dart';
 // import 'package:flutter/material.dart';
+// import 'package:provider/provider.dart';
 // import 'package:splitzon/api/api_controller.dart';
 // import 'package:splitzon/core/utils/otp_screen.dart';
 // import 'package:splitzon/core/utils/otp_screen_login.dart';
 // import 'package:splitzon/core/widgets/show_snack_bar.dart';
+// import 'package:splitzon/provider/user_providers.dart';
+// import 'package:splitzon/providers/group_provider.dart';
 
 // class FirebaseAuthMethods {
 //   final FirebaseAuth _auth;
-
 //   FirebaseAuthMethods(this._auth);
 
-//   /// ===============================
 //   /// SEND OTP (SIGNUP)
-//   /// ===============================
 //   Future<void> sendOtp({
 //     required BuildContext context,
 //     required String name,
@@ -220,15 +250,12 @@ class FirebaseAuthMethods {
 //     try {
 //       await _auth.verifyPhoneNumber(
 //         phoneNumber: phone,
-
 //         verificationCompleted: (credential) async {
 //           await _auth.signInWithCredential(credential);
 //         },
-
 //         verificationFailed: (e) {
 //           showSnackBar(context, e.message ?? "OTP Failed");
 //         },
-
 //         codeSent: (verificationId, _) {
 //           Navigator.push(
 //             context,
@@ -243,7 +270,6 @@ class FirebaseAuthMethods {
 //             ),
 //           );
 //         },
-
 //         codeAutoRetrievalTimeout: (_) {},
 //       );
 //     } catch (e) {
@@ -251,9 +277,41 @@ class FirebaseAuthMethods {
 //     }
 //   }
 
-//   /// ===============================
+//   /// SEND OTP (LOGIN)
+//   Future<void> sendOtpLogin({
+//     required BuildContext context,
+//     required String phone,
+//     required bool rememberMe,
+//   }) async {
+//     try {
+//       await _auth.verifyPhoneNumber(
+//         phoneNumber: phone,
+//         verificationCompleted: (credential) async {
+//           await _auth.signInWithCredential(credential);
+//         },
+//         verificationFailed: (e) {
+//           showSnackBar(context, e.message ?? "OTP Failed");
+//         },
+//         codeSent: (verificationId, _) {
+//           Navigator.push(
+//             context,
+//             MaterialPageRoute(
+//               builder: (_) => OtpScreenLogin(
+//                 phone: phone,
+//                 verificationId: verificationId,
+//                 rememberMe: rememberMe,
+//               ),
+//             ),
+//           );
+//         },
+//         codeAutoRetrievalTimeout: (_) {},
+//       );
+//     } catch (e) {
+//       showSnackBar(context, e.toString());
+//     }
+//   }
+
 //   /// VERIFY OTP (SIGNUP)
-//   /// ===============================
 //   Future<void> verifyOtpAndHandleUser({
 //     required BuildContext context,
 //     required String verificationId,
@@ -269,10 +327,8 @@ class FirebaseAuthMethods {
 //         smsCode: otp,
 //       );
 
-//       UserCredential userCredential = await _auth.signInWithCredential(
-//         credential,
-//       );
-
+//       UserCredential userCredential =
+//           await _auth.signInWithCredential(credential);
 //       User? user = userCredential.user;
 
 //       if (user == null) {
@@ -280,9 +336,6 @@ class FirebaseAuthMethods {
 //         return;
 //       }
 
-//       print("✅ Firebase UID: ${user.uid}"); // ← add
-
-//       /// 🔥 SAVE TO BACKEND (MongoDB)
 //       final res = await ApiService.signupComplete(
 //         name: name,
 //         email: email,
@@ -290,69 +343,39 @@ class FirebaseAuthMethods {
 //         firebaseUid: user.uid,
 //       );
 
-//       print("📦 Response: $res"); // ← add
+//       print("📦 Signup Response: $res");
 
 //       if (res["success"] == true) {
-//         showSnackBar(context, "Account Created");
+//         if (context.mounted) {
+//           // ✅ Get both providers
+//           final userProvider =
+//               Provider.of<UserProviders>(context, listen: false);
+//           final groupProvider =
+//               Provider.of<GroupProvider>(context, listen: false);
 
-//         Navigator.pushNamedAndRemoveUntil(
-//           context,
-//           "/home",
-//           (route) => false,
-//           arguments: res["user"],
-//         );
+//           // ✅ Pass token + groupProvider so sync works immediately
+//           await userProvider.setAuthenticated(
+//             res["user"],
+//             res["token"],   // ← JWT token from backend
+//             groupProvider,  // ← so GroupProvider gets userId + token
+//           );
+
+//           showSnackBar(context, "Account Created!");
+//           Navigator.pushNamedAndRemoveUntil(
+//               context, "/home", (route) => false);
+//         }
 //       } else {
-//         showSnackBar(context, res["message"] ?? "Something went wrong");
+//         if (context.mounted) {
+//           showSnackBar(context, res["message"] ?? "Signup failed");
+//         }
 //       }
 //     } catch (e) {
-//       print("🔥 OTP Error: $e"); // ← add
-//       showSnackBar(context, e.toString()); // ← show real error
+//       print("🔥 OTP Error: $e");
+//       if (context.mounted) showSnackBar(context, e.toString());
 //     }
 //   }
 
-//   /// ===============================
-//   /// SEND OTP LOGIN
-//   /// ===============================
-//   Future<void> sendOtpLogin({
-//     required BuildContext context,
-//     required String phone,
-//     required bool rememberMe,
-//   }) async {
-//     try {
-//       await _auth.verifyPhoneNumber(
-//         phoneNumber: phone,
-
-//         verificationCompleted: (credential) async {
-//           await _auth.signInWithCredential(credential);
-//         },
-
-//         verificationFailed: (e) {
-//           showSnackBar(context, e.message ?? "OTP Failed");
-//         },
-
-//         codeSent: (verificationId, _) {
-//           Navigator.push(
-//             context,
-//             MaterialPageRoute(
-//               builder: (_) => OtpScreenLogin(
-//                 phone: phone,
-//                 verificationId: verificationId,
-//                 rememberMe: rememberMe,
-//               ),
-//             ),
-//           );
-//         },
-
-//         codeAutoRetrievalTimeout: (_) {},
-//       );
-//     } catch (e) {
-//       showSnackBar(context, e.toString());
-//     }
-//   }
-
-//   /// ===============================
-//   /// VERIFY OTP LOGIN
-//   /// ===============================
+//   /// VERIFY OTP (LOGIN)
 //   Future<void> verifyOtpAndHandleUserSignin({
 //     required BuildContext context,
 //     required String verificationId,
@@ -366,10 +389,8 @@ class FirebaseAuthMethods {
 //         smsCode: otp,
 //       );
 
-//       UserCredential userCredential = await _auth.signInWithCredential(
-//         credential,
-//       );
-
+//       UserCredential userCredential =
+//           await _auth.signInWithCredential(credential);
 //       User? user = userCredential.user;
 
 //       if (user == null) {
@@ -377,29 +398,50 @@ class FirebaseAuthMethods {
 //         return;
 //       }
 
-//       /// 🔥 FETCH USER FROM BACKEND
 //       final res = await ApiService.loginComplete(firebaseUid: user.uid);
 
+//       print("📦 Login Response: $res");
+
 //       if (res["success"] == true) {
-//         Navigator.pushNamedAndRemoveUntil(
-//           context,
-//           "/home",
-//           (route) => false,
-//           arguments: res["user"],
-//         );
+//         if (context.mounted) {
+//           // ✅ Get both providers
+//           final userProvider =
+//               Provider.of<UserProviders>(context, listen: false);
+//           final groupProvider =
+//               Provider.of<GroupProvider>(context, listen: false);
+
+//           // ✅ Pass token + groupProvider
+//           await userProvider.setAuthenticated(
+//             res["user"],
+//             res["token"],   // ← JWT token from backend
+//             groupProvider,  // ← so GroupProvider gets userId + token
+//           );
+
+//           Navigator.pushNamedAndRemoveUntil(
+//               context, "/home", (route) => false);
+//         }
 //       } else {
-//         showSnackBar(context, res["message"]);
+//         if (context.mounted) {
+//           showSnackBar(context, res["message"] ?? "Login failed");
+//         }
 //       }
 //     } catch (e) {
-//       showSnackBar(context, "Invalid OTP");
+//       print("🔥 Login OTP Error: $e");
+//       if (context.mounted) showSnackBar(context, e.toString());
 //     }
 //   }
 
 //   /// LOGOUT
 //   Future<void> signOut(BuildContext context) async {
-//     await _auth.signOut();
-//     // await GoogleSignIn().signOut();
+//     final groupProvider =
+//         Provider.of<GroupProvider>(context, listen: false);
 
-//     Navigator.pushNamedAndRemoveUntil(context, "/", (route) => false);
+//     // ✅ Pass groupProvider so it clears SQLite + token
+//     await Provider.of<UserProviders>(context, listen: false)
+//         .logout(groupProvider);
+
+//     if (context.mounted) {
+//       Navigator.pushNamedAndRemoveUntil(context, "/", (route) => false);
+//     }
 //   }
 // }
