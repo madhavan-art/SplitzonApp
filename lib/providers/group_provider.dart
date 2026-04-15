@@ -8,21 +8,29 @@ class GroupProvider with ChangeNotifier {
 
   List<Group> _groups = [];
   bool _isLoading = false;
+
   String? _authToken;
   String? _userId;
+
   String _lastError = '';
   String _lastMessage = '';
 
   SyncService? _syncService;
 
-  GroupProvider({
-    GroupRepository? groupRepository,
-  }) : _groupRepository = groupRepository ?? GroupRepository();
+  GroupProvider({GroupRepository? groupRepository})
+    : _groupRepository = groupRepository ?? GroupRepository();
+
+  // ───────────────── GETTERS ─────────────────
 
   List<Group> get groups => _groups;
+
   bool get isLoading => _isLoading;
+
   String get lastError => _lastError;
+
   String get lastMessage => _lastMessage;
+
+  // ───────────────── LOGGING ─────────────────
 
   void _log(String message) {
     debugPrint('📦 GroupProvider: $message');
@@ -33,6 +41,8 @@ class GroupProvider with ChangeNotifier {
     debugPrint('❌ GroupProvider Error: $error');
     _lastError = error;
   }
+
+  // ───────────────── AUTH SETUP ─────────────────
 
   void setAuthToken(String token) {
     _authToken = token;
@@ -46,27 +56,51 @@ class GroupProvider with ChangeNotifier {
     _log('UserId set: $userId');
   }
 
-  void _rebuildSyncService() {
-    if (_userId != null && _userId!.isNotEmpty) {
-      _syncService = SyncService(userId: _userId);
-    }
-  }
-
   void clearAuthToken() {
     _authToken = null;
   }
 
-  // ── LOGOUT — clear RAM only, SQLite stays ─────────────────
+  void _rebuildSyncService() {
+    if (_userId != null && _userId!.isNotEmpty) {
+      _syncService = SyncService(userId: _userId);
+      _log('SyncService initialized');
+    }
+  }
+
+  // ───────────────── LOGOUT ─────────────────
+
+  /// Clears RAM only
+  /// SQLite data remains safe
   Future<void> clearForLogout() async {
     _groups = [];
     _authToken = null;
     _userId = null;
     _syncService = null;
+
     notifyListeners();
-    _log('Cleared on logout');
+
+    _log('Cleared provider on logout');
   }
 
-  // ── LOAD GROUPS ───────────────────────────────────────────
+  // ───────────────── INITIALIZE ─────────────────
+
+  Future<void> initialize() async {
+    try {
+      _log("initialize() called");
+
+      if (_userId == null || _userId!.isEmpty) {
+        _logError("UserId not set");
+        return;
+      }
+
+      await loadGroups();
+    } catch (e) {
+      _logError("initialize error: $e");
+    }
+  }
+
+  // ───────────────── LOAD GROUPS ─────────────────
+
   Future<void> loadGroups() async {
     if (_userId == null || _userId!.isEmpty) {
       _log('No userId — skipping load');
@@ -77,92 +111,108 @@ class GroupProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Step 1 — Show SQLite instantly (works offline too)
+      // STEP 1 — LOAD SQLITE FIRST (FAST / OFFLINE)
+
       _groups = await _groupRepository.fetchGroups(_userId!);
+
       _isLoading = false;
       notifyListeners();
+
       _log('SQLite has ${_groups.length} groups');
 
-      // Step 2 — Sync with backend in background
-      if (_authToken != null && _authToken!.isNotEmpty) {
+      // STEP 2 — SYNC BACKEND
+
+      if (_authToken != null &&
+          _authToken!.isNotEmpty &&
+          _syncService != null) {
         await _fetchFromBackendAndRefresh();
       }
     } catch (e) {
       _isLoading = false;
       notifyListeners();
+
       _logError('loadGroups error: $e');
     }
   }
 
-  // ── CORE SYNC: MongoDB → SQLite → UI ─────────────────────
+  // ───────────────── CORE SYNC ─────────────────
+
   Future<void> _fetchFromBackendAndRefresh() async {
-    if (_syncService == null || _userId == null) return;
+    if (_syncService == null || _authToken == null || _userId == null) {
+      return;
+    }
 
     try {
-      _log('Fetching groups from MongoDB...');
+      _log('Fetching groups from backend...');
 
-      // 1. Push any local PENDING groups to backend first
+      /// 1 — PUSH PENDING GROUPS
+
       await _syncService!.syncPendingGroups(_authToken!);
 
-      // 2. Pull all groups from MongoDB
-      //    SyncService saves each one to SQLite via insertOrUpdate
-      final backendGroups =
-          await _syncService!.fetchAndSyncGroups(_authToken!);
-      _log('Got ${backendGroups.length} groups from MongoDB');
+      /// 2 — FETCH FROM BACKEND
 
-      // 3. ✅ STALE CLEANUP
-      //    Find groups that are in SQLite (SYNCED) but NOT in MongoDB
-      //    These were deleted directly from MongoDB — remove them locally
+      final backendGroups = await _syncService!.fetchAndSyncGroups(_authToken!);
+
+      _log('Got ${backendGroups.length} groups from backend');
+
+      /// 3 — REMOVE STALE GROUPS
+
       await _removeStaleGroups(backendGroups);
 
-      // 4. Reload from SQLite — now perfectly matches MongoDB
+      /// 4 — RELOAD SQLITE
+
       _groups = await _groupRepository.fetchGroups(_userId!);
+
       notifyListeners();
-      _log('UI updated with ${_groups.length} groups ✅');
+
+      _log('UI updated with ${_groups.length} groups');
     } catch (e) {
-      _logError('Backend fetch failed (showing cache): $e');
+      _logError('Backend sync failed — using cache: $e');
     }
   }
 
-  // ── REMOVE GROUPS DELETED FROM MONGODB ───────────────────
-  // Logic:
-  //   SQLite has: [A, B, C]          (SYNCED groups)
-  //   MongoDB returns: [A, C]        (B was deleted directly)
-  //   → Delete B from SQLite         (B is stale)
-  //   PENDING groups are skipped     (they haven't synced yet,
-  //                                   MongoDB doesn't know about them)
+  // ───────────────── STALE CLEANUP ─────────────────
+
   Future<void> _removeStaleGroups(List<Group> backendGroups) async {
-    // Get all MongoDB ids returned
-    final backendIds = backendGroups.map((g) => g.id).toSet();
+    try {
+      final backendIds = backendGroups.map((g) => g.id).toSet();
 
-    // Get current SQLite groups for this user
-    final localGroups = await _groupRepository.fetchGroups(_userId!);
+      final localGroups = await _groupRepository.fetchGroups(_userId!);
 
-    // Find SYNCED groups in SQLite that are NOT in MongoDB response
-    final stale = localGroups.where((local) {
-      final isSynced = local.syncStatus == 'SYNCED';
-      final missingFromBackend = !backendIds.contains(local.id);
-      return isSynced && missingFromBackend;
-      // PENDING groups are intentionally excluded — they exist
-      // locally only and haven't been pushed to MongoDB yet
-    }).toList();
+      final stale = localGroups.where((local) {
+        final isSynced = local.syncStatus == 'SYNCED';
 
-    if (stale.isEmpty) return;
+        final missingFromBackend = !backendIds.contains(local.id);
 
-    _log('Removing ${stale.length} stale group(s) deleted from MongoDB');
-    for (final group in stale) {
-      await _groupRepository.deleteGroup(group.id);
-      _log('Removed stale group: ${group.name} (${group.id})');
+        return isSynced && missingFromBackend;
+      }).toList();
+
+      if (stale.isEmpty) return;
+
+      _log('Removing ${stale.length} stale group(s)');
+
+      for (final group in stale) {
+        await _groupRepository.deleteGroup(group.id);
+
+        _log('Removed stale group: ${group.name}');
+      }
+    } catch (e) {
+      _logError('removeStaleGroups error: $e');
     }
   }
 
-  // ── PUBLIC SYNC (called by ConnectivityService) ───────────
+  // ───────────────── PUBLIC SYNC ─────────────────
+
   Future<void> syncWithBackend() async {
-    if (_authToken == null || _syncService == null || _userId == null) return;
+    if (_authToken == null || _syncService == null || _userId == null) {
+      return;
+    }
+
     await _fetchFromBackendAndRefresh();
   }
 
-  // ── CREATE GROUP ──────────────────────────────────────────
+  // ───────────────── CREATE GROUP ─────────────────
+
   Future<Group?> createGroup({
     required String name,
     String? description,
@@ -195,48 +245,55 @@ class GroupProvider with ChangeNotifier {
         bannerImagePath: bannerImagePath,
       );
 
-      // Save to SQLite immediately — UI shows it right away
+      /// SAVE SQLITE
+
       await _groupRepository.addGroup(group);
+
       _groups.insert(0, group);
+
       notifyListeners();
+
       _log('Saved to SQLite as PENDING: ${group.id}');
+
+      /// TRY IMMEDIATE SYNC
 
       if (_authToken != null &&
           _authToken!.isNotEmpty &&
           _syncService != null) {
-        // Push to backend → SyncService deletes local uuid copy on success
-        final result =
-            await _syncService!.syncGroupImmediately(group, _authToken!);
+        final result = await _syncService!.syncGroupImmediately(
+          group,
+          _authToken!,
+        );
 
         if (result['success'] == true) {
-          // Reload from MongoDB so we get the clean MongoDB _id version
-          // (no duplicate: local uuid copy was deleted by SyncService)
           await _fetchFromBackendAndRefresh();
-          _log('Group created and synced ✅');
+
+          _log('Group created and synced');
         } else {
-          _logError('Sync failed — stays PENDING until internet returns');
+          _logError('Sync failed — remains PENDING');
         }
       } else {
-        _log('Offline — group is PENDING, syncs when internet returns');
+        _log('Offline — group will sync later');
       }
 
       return group;
     } catch (e) {
       _logError('createGroup error: $e');
+
       return null;
     }
   }
 
-  // ── DELETE ────────────────────────────────────────────────
+  // ───────────────── DELETE GROUP ─────────────────
+
   Future<bool> deleteGroup(String id) async {
     try {
-      final group = _groups.firstWhere(
-        (g) => g.id == id,
-        orElse: () => throw Exception('Group not found'),
-      );
+      final group = _groups.firstWhere((g) => g.id == id);
 
       await _groupRepository.deleteGroup(id);
+
       _groups.removeWhere((g) => g.id == id);
+
       notifyListeners();
 
       if (group.syncStatus == 'SYNCED' &&
@@ -248,33 +305,40 @@ class GroupProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _logError('deleteGroup error: $e');
+
       return false;
     }
   }
 
-  // ── UPDATE ────────────────────────────────────────────────
+  // ───────────────── UPDATE GROUP ─────────────────
+
   Future<bool> updateGroup(Group updatedGroup) async {
     try {
       await _groupRepository.updateGroup(updatedGroup);
+
       final index = _groups.indexWhere((g) => g.id == updatedGroup.id);
+
       if (index != -1) {
         _groups[index] = updatedGroup;
+
         notifyListeners();
       }
+
       return true;
     } catch (e) {
       _logError('updateGroup error: $e');
+
       return false;
     }
   }
+
+  // ───────────────── HELPERS ─────────────────
 
   List<Group> getPendingGroups() =>
       _groups.where((g) => g.syncStatus == 'PENDING').toList();
 
   List<Group> getSyncedGroups() =>
       _groups.where((g) => g.syncStatus == 'SYNCED').toList();
-
-  Future<void> initialize() async => await loadGroups();
 }
 
 // import 'package:flutter/material.dart';

@@ -1,11 +1,15 @@
+// ════════════════════════════════════════════════════════════════
+// FILE: lib/data/local/database_helper.dart
+// ════════════════════════════════════════════════════════════════
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/group_model.dart';
+import '../models/expense_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
-
   DatabaseHelper._init();
 
   Future<Database> get database async {
@@ -17,16 +21,16 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-
     return await openDatabase(
       path,
-      version: 3,
+      version: 4, // ← bumped to 4 for expenses table
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
+    // ── GROUPS TABLE ──────────────────────────────────────────
     await db.execute('''
       CREATE TABLE groups (
         id TEXT PRIMARY KEY,
@@ -45,52 +49,104 @@ class DatabaseHelper {
         syncStatus TEXT NOT NULL
       )
     ''');
+
+    // ── EXPENSES TABLE ────────────────────────────────────────
+    await db.execute('''
+      CREATE TABLE expenses (
+        id TEXT PRIMARY KEY,
+        groupId TEXT NOT NULL,
+        userId TEXT NOT NULL DEFAULT "",
+        title TEXT NOT NULL,
+        amount REAL NOT NULL,
+        category TEXT DEFAULT "Other",
+        notes TEXT DEFAULT "",
+        date TEXT NOT NULL,
+        paidByUserId TEXT DEFAULT "",
+        paidByName TEXT DEFAULT "",
+        splitType TEXT DEFAULT "equal",
+        memberShares TEXT DEFAULT "[]",
+        syncStatus TEXT NOT NULL DEFAULT "PENDING"
+      )
+    ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE groups ADD COLUMN description TEXT DEFAULT ""');
-      await db.execute('ALTER TABLE groups ADD COLUMN groupType TEXT DEFAULT "Other"');
-      await db.execute('ALTER TABLE groups ADD COLUMN currency TEXT DEFAULT "INR"');
-      await db.execute('ALTER TABLE groups ADD COLUMN overallBudget REAL DEFAULT 0.0');
-      await db.execute('ALTER TABLE groups ADD COLUMN myShare REAL DEFAULT 0.0');
-      await db.execute('ALTER TABLE groups ADD COLUMN createdBy TEXT DEFAULT ""');
-      await db.execute('ALTER TABLE groups ADD COLUMN bannerImagePath TEXT DEFAULT ""');
-      await db.execute('ALTER TABLE groups ADD COLUMN bannerImageUrl TEXT DEFAULT ""');
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN description TEXT DEFAULT ""',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN groupType TEXT DEFAULT "Other"',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN currency TEXT DEFAULT "INR"',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN overallBudget REAL DEFAULT 0.0',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN myShare REAL DEFAULT 0.0',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN createdBy TEXT DEFAULT ""',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN bannerImagePath TEXT DEFAULT ""',
+      );
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN bannerImageUrl TEXT DEFAULT ""',
+      );
     }
     if (oldVersion < 3) {
       await db.execute(
-          'ALTER TABLE groups ADD COLUMN userId TEXT NOT NULL DEFAULT ""');
+        'ALTER TABLE groups ADD COLUMN userId TEXT NOT NULL DEFAULT ""',
+      );
+    }
+    if (oldVersion < 4) {
+      // Add expenses table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+          id TEXT PRIMARY KEY,
+          groupId TEXT NOT NULL,
+          userId TEXT NOT NULL DEFAULT "",
+          title TEXT NOT NULL,
+          amount REAL NOT NULL,
+          category TEXT DEFAULT "Other",
+          notes TEXT DEFAULT "",
+          date TEXT NOT NULL,
+          paidByUserId TEXT DEFAULT "",
+          paidByName TEXT DEFAULT "",
+          splitType TEXT DEFAULT "equal",
+          memberShares TEXT DEFAULT "[]",
+          syncStatus TEXT NOT NULL DEFAULT "PENDING"
+        )
+      ''');
     }
   }
 
-  // ── INSERT (new group) ────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  // GROUP METHODS
+  // ════════════════════════════════════════════════════════════
+
   Future<Group> insertGroup(Group group) async {
     final db = await database;
     await db.insert(
       'groups',
       group.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.ignore, // skip if id already exists
+      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
     return group;
   }
 
-  // ── INSERT OR REPLACE ─────────────────────────────────────
-  // ✅ This is what fetchAndSyncGroups should use.
-  // If the group already exists → update it.
-  // If it doesn't exist yet    → insert it.
-  // This is why 2 backend groups were becoming 1 — updateGroup
-  // was silently doing nothing for rows that didn't exist yet.
   Future<void> insertOrUpdateGroup(Group group) async {
     final db = await database;
     await db.insert(
       'groups',
       group.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace, // ← insert OR update
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  // ── GET ALL GROUPS FOR A USER ─────────────────────────────
   Future<List<Group>> getGroupsByUser(String userId) async {
     final db = await database;
     final maps = await db.query(
@@ -99,10 +155,9 @@ class DatabaseHelper {
       whereArgs: [userId],
       orderBy: 'createdAt DESC',
     );
-    return maps.map((map) => Group.fromMap(map)).toList();
+    return maps.map((m) => Group.fromMap(m)).toList();
   }
 
-  // ── UPDATE (existing group only) ──────────────────────────
   Future<int> updateGroup(Group group) async {
     final db = await database;
     return db.update(
@@ -113,16 +168,84 @@ class DatabaseHelper {
     );
   }
 
-  // ── DELETE ONE ────────────────────────────────────────────
   Future<int> deleteGroup(String id) async {
     final db = await database;
     return db.delete('groups', where: 'id = ?', whereArgs: [id]);
   }
 
-  // ── DELETE ALL FOR USER ───────────────────────────────────
   Future<void> deleteAllGroupsForUser(String userId) async {
     final db = await database;
     await db.delete('groups', where: 'userId = ?', whereArgs: [userId]);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // EXPENSE METHODS
+  // ════════════════════════════════════════════════════════════
+
+  /// Insert new expense — skip if id already exists
+  Future<Expense> insertExpense(Expense expense) async {
+    final db = await database;
+    await db.insert(
+      'expenses',
+      expense.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+    return expense;
+  }
+
+  /// Insert OR replace (used when syncing from backend)
+  Future<void> insertOrUpdateExpense(Expense expense) async {
+    final db = await database;
+    await db.insert(
+      'expenses',
+      expense.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Get all expenses for a specific group
+  Future<List<Expense>> getExpensesByGroup(String groupId) async {
+    final db = await database;
+    final maps = await db.query(
+      'expenses',
+      where: 'groupId = ?',
+      whereArgs: [groupId],
+      orderBy: 'date DESC',
+    );
+    return maps.map((m) => Expense.fromMap(m)).toList();
+  }
+
+  /// Get all PENDING expenses for a user (for offline sync)
+  Future<List<Expense>> getPendingExpensesByUser(String userId) async {
+    final db = await database;
+    final maps = await db.query(
+      'expenses',
+      where: 'userId = ? AND syncStatus = ?',
+      whereArgs: [userId, 'PENDING'],
+      orderBy: 'date DESC',
+    );
+    return maps.map((m) => Expense.fromMap(m)).toList();
+  }
+
+  Future<int> updateExpense(Expense expense) async {
+    final db = await database;
+    return db.update(
+      'expenses',
+      expense.toMap(),
+      where: 'id = ?',
+      whereArgs: [expense.id],
+    );
+  }
+
+  Future<int> deleteExpense(String id) async {
+    final db = await database;
+    return db.delete('expenses', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Delete all expenses for a group (called when group is deleted)
+  Future<void> deleteExpensesByGroup(String groupId) async {
+    final db = await database;
+    await db.delete('expenses', where: 'groupId = ?', whereArgs: [groupId]);
   }
 
   Future close() async {
@@ -154,10 +277,31 @@ class DatabaseHelper {
 
 //     return await openDatabase(
 //       path,
-//       version: 3, // ← bumped from 2 to 3
+//       version: 3,
 //       onCreate: _createDB,
 //       onUpgrade: _upgradeDB,
 //     );
+//   }
+
+//   Future<void> debugPrintAllGroups() async {
+//     final db = await database;
+
+//     final rows = await db.query('groups');
+
+//     print("===== SQLITE GROUPS DEBUG =====");
+
+//     if (rows.isEmpty) {
+//       print("No groups in SQLite");
+//       return;
+//     }
+
+//     for (final row in rows) {
+//       print("ID: ${row['id']}");
+//       print("userId: ${row['userId']}");
+//       print("name: ${row['name']}");
+//       print("syncStatus: ${row['syncStatus']}");
+//       print("----------------------------");
+//     }
 //   }
 
 //   Future<void> _createDB(Database db, int version) async {
@@ -183,30 +327,65 @@ class DatabaseHelper {
 
 //   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
 //     if (oldVersion < 2) {
-//       await db.execute('ALTER TABLE groups ADD COLUMN description TEXT DEFAULT ""');
-//       await db.execute('ALTER TABLE groups ADD COLUMN groupType TEXT DEFAULT "Other"');
-//       await db.execute('ALTER TABLE groups ADD COLUMN currency TEXT DEFAULT "INR"');
-//       await db.execute('ALTER TABLE groups ADD COLUMN overallBudget REAL DEFAULT 0.0');
-//       await db.execute('ALTER TABLE groups ADD COLUMN myShare REAL DEFAULT 0.0');
-//       await db.execute('ALTER TABLE groups ADD COLUMN createdBy TEXT DEFAULT ""');
-//       await db.execute('ALTER TABLE groups ADD COLUMN bannerImagePath TEXT DEFAULT ""');
-//       await db.execute('ALTER TABLE groups ADD COLUMN bannerImageUrl TEXT DEFAULT ""');
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN description TEXT DEFAULT ""',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN groupType TEXT DEFAULT "Other"',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN currency TEXT DEFAULT "INR"',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN overallBudget REAL DEFAULT 0.0',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN myShare REAL DEFAULT 0.0',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN createdBy TEXT DEFAULT ""',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN bannerImagePath TEXT DEFAULT ""',
+//       );
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN bannerImageUrl TEXT DEFAULT ""',
+//       );
 //     }
 //     if (oldVersion < 3) {
-//       // ← NEW: add userId column to existing installs
-//       await db.execute('ALTER TABLE groups ADD COLUMN userId TEXT NOT NULL DEFAULT ""');
+//       await db.execute(
+//         'ALTER TABLE groups ADD COLUMN userId TEXT NOT NULL DEFAULT ""',
+//       );
 //     }
 //   }
 
-//   // ── INSERT ────────────────────────────────────────────────
+//   // ── INSERT (new group) ────────────────────────────────────
 //   Future<Group> insertGroup(Group group) async {
 //     final db = await database;
-//     await db.insert('groups', group.toMap());
+//     await db.insert(
+//       'groups',
+//       group.toMap(),
+//       conflictAlgorithm: ConflictAlgorithm.ignore, // skip if id already exists
+//     );
 //     return group;
 //   }
 
-//   // ── GET ALL GROUPS FOR A SPECIFIC USER ───────────────────
-//   // ← was fetchAll with no filter, now filters by userId
+//   // ── INSERT OR REPLACE ─────────────────────────────────────
+//   // ✅ This is what fetchAndSyncGroups should use.
+//   // If the group already exists → update it.
+//   // If it doesn't exist yet    → insert it.
+//   // This is why 2 backend groups were becoming 1 — updateGroup
+//   // was silently doing nothing for rows that didn't exist yet.
+//   Future<void> insertOrUpdateGroup(Group group) async {
+//     final db = await database;
+//     await db.insert(
+//       'groups',
+//       group.toMap(),
+//       conflictAlgorithm: ConflictAlgorithm.replace, // ← insert OR update
+//     );
+//   }
+
+//   // ── GET ALL GROUPS FOR A USER ─────────────────────────────
 //   Future<List<Group>> getGroupsByUser(String userId) async {
 //     final db = await database;
 //     final maps = await db.query(
@@ -218,7 +397,7 @@ class DatabaseHelper {
 //     return maps.map((map) => Group.fromMap(map)).toList();
 //   }
 
-//   // ── UPDATE ────────────────────────────────────────────────
+//   // ── UPDATE (existing group only) ──────────────────────────
 //   Future<int> updateGroup(Group group) async {
 //     final db = await database;
 //     return db.update(
@@ -229,24 +408,16 @@ class DatabaseHelper {
 //     );
 //   }
 
-//   // ── DELETE ────────────────────────────────────────────────
+//   // ── DELETE ONE ────────────────────────────────────────────
 //   Future<int> deleteGroup(String id) async {
 //     final db = await database;
-//     return db.delete(
-//       'groups',
-//       where: 'id = ?',
-//       whereArgs: [id],
-//     );
+//     return db.delete('groups', where: 'id = ?', whereArgs: [id]);
 //   }
 
-//   // ── DELETE ALL GROUPS FOR A USER (called on logout) ───────
+//   // ── DELETE ALL FOR USER ───────────────────────────────────
 //   Future<void> deleteAllGroupsForUser(String userId) async {
 //     final db = await database;
-//     await db.delete(
-//       'groups',
-//       where: 'userId = ?',
-//       whereArgs: [userId],
-//     );
+//     await db.delete('groups', where: 'userId = ?', whereArgs: [userId]);
 //   }
 
 //   Future close() async {
@@ -254,3 +425,4 @@ class DatabaseHelper {
 //     db.close();
 //   }
 // }
+

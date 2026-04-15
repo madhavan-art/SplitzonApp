@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/core/utils/background_main_theme.dart';
 import 'package:splitzon/features/add_group/add_group_screen.dart';
+import 'package:splitzon/features/gorup_dashboard/grp_dashboard_screen.dart';
 import 'package:splitzon/features/home/balance_card.dart';
 import 'package:splitzon/providers/group_provider.dart';
 import 'package:splitzon/services/firebase_auth.dart';
@@ -29,8 +30,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const int _initialCount = 5;
   bool _showAll = false;
 
-  
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -43,6 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+
     // Load groups from Provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GroupProvider>().initialize();
@@ -60,13 +60,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Create group via Provider
       final name = result['name'] as String;
       final members = List<String>.from(result['members'] ?? []);
-      
+
       await context.read<GroupProvider>().createGroup(
         name: name,
         members: members,
         groupType: 'Other', // Default group type
       );
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -99,8 +99,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // final userProvider = context.watch<UserProviders>();
+    // final userName = userProvider.user?.name ?? 'User';
     final userProvider = context.watch<UserProviders>();
-  final userName = userProvider.user?.name ?? 'User';
+
+    print("===== USER PROVIDER =====");
+    print(userProvider.user);
+    print("User name:");
+    print(userProvider.user?.name);
+
+    final userName = userProvider.user?.name ?? 'User';
     return Consumer<GroupProvider>(
       builder: (context, groupProvider, child) {
         final mq = MediaQuery.of(context);
@@ -128,7 +136,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   // ── FIXED PINNED HEADER ──────────────────────────────
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: hPad,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(.9),
                       boxShadow: [
@@ -175,10 +186,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: AppColors.primary.withOpacity(.15),
-                            child: const Icon(
-                              Icons.person,
-                              color: AppColors.primary,
-                              size: 20,
+                            // child: const Icon(
+                            //   Icons.person,
+                            //   color: AppColors.primary,
+                            //   size: 20,
+                            // ),
+                            child: Text(
+                              userName.isNotEmpty
+                                  ? userName[0].toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -231,7 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           const SizedBox(height: 15),
 
-                          QuickActions(onNewGroup: _openAddGroup,),
+                          QuickActions(onNewGroup: _openAddGroup),
                           const SizedBox(height: 25),
 
                           /// GROUPS HEADER
@@ -252,7 +272,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     Text(
                                       'See More',
                                       style: TextStyle(
-                                        color: AppColors.primary.withOpacity(.8),
+                                        color: AppColors.primary.withOpacity(
+                                          .8,
+                                        ),
                                       ),
                                     ),
                                     Icon(
@@ -272,15 +294,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           else if (groups.isEmpty)
                             _buildEmptyState()
                           else
-                            ...visibleGroups.map((group) => _buildGroupCard(group)),
+                            ...visibleGroups.map(
+                              (group) => _buildGroupCard(group),
+                            ),
 
                           const SizedBox(height: 10),
 
                           /// ✅ SEE MORE / SEE LESS BUTTON AT BOTTOM
-                          if (!groupProvider.isLoading && groups.length > _initialCount)
+                          if (!groupProvider.isLoading &&
+                              groups.length > _initialCount)
                             Center(
                               child: OutlinedButton.icon(
-                                onPressed: () => setState(() => _showAll = !_showAll),
+                                onPressed: () =>
+                                    setState(() => _showAll = !_showAll),
                                 icon: Icon(
                                   _showAll
                                       ? Icons.keyboard_arrow_up_rounded
@@ -339,10 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
           Text(
             'Create your first group to get started',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -350,181 +373,266 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ══════════════════════════════════════════════════════════
+  // REPLACE your _buildGroupCard method in dashboard_screen.dart
+  // with this version — adds onTap to navigate to GroupDetailScreen
+  // ══════════════════════════════════════════════════════════
+
+  // Add this import at the top of dashboard_screen.dart:
+  // import 'package:splitzon/features/group_detail/group_detail_screen.dart';
+
   Widget _buildGroupCard(Group group) {
-    // Get currency symbol based on currency code
+    final userProvider = context.read<UserProviders>();
+
+    final currentUserId = userProvider.user?.id ?? "";
+    print("===== GROUP =====");
+    print(group.name);
+    print("Members:");
+    print(group.members);
     String currencySymbol = _getCurrencySymbol(group.currency);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.85),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            spreadRadius: 0,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top section: Image + Title/Budget row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left: Group Image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(.1),
+
+    return GestureDetector(
+      onTap: () {
+        // ✅ Navigate to GroupDetailScreen passing the group
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => GroupDetailScreen(group: group)),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(.85),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              spreadRadius: 0,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Group Image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(.1),
+                    ),
+                    child: _buildGroupImage(group),
                   ),
-                  child: _buildGroupImage(group),
                 ),
-              ),
-
-              const SizedBox(width: 14),
-
-              // Right: Title + Budget + Description
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title row with budget on right
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            group.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                              letterSpacing: 0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        // Overall budget on right side of title
-                        if (group.overallBudget != null && group.overallBudget! > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
                             child: Text(
-                              '$currencySymbol${_formatBudget(group.overallBudget!)}',
-                              style: TextStyle(
-                                fontSize: 13,
+                              group.name,
+                              style: const TextStyle(
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
+                                color: AppColors.textPrimary,
+                                letterSpacing: 0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (group.overallBudget != null &&
+                              group.overallBudget! > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$currencySymbol${_formatBudget(group.overallBudget!)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // Description below title
-                    if (group.description != null && group.description!.isNotEmpty)
-                      Text(
-                        group.description!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          height: 1.4,
-                        ),
+                        ],
                       ),
-
+                      const SizedBox(height: 4),
+                      if (group.description != null &&
+                          group.description!.isNotEmpty)
+                        Text(
+                          group.description!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
                       const SizedBox(height: 12),
-
-          // Bottom section: Members
-
                       Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Member avatars
-              SizedBox(
-                height: 28,
-                width: group.members.length > 3
-                    ? 70
-                    : (group.members.length * 20.0 + 8),
-                child: Stack(
-                  children: List.generate(
-                    group.members.length > 3 ? 3 : group.members.length,
-                    (index) => Positioned(
-                      left: index * 18.0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            height: 28,
+                            width: group.members.length > 3
+                                ? 100
+                                : (group.members.length * 20.0 + 8),
+                            child: Builder(
+                              builder: (context) {
+                                final displayCount = group.members.length > 3
+                                    ? 3
+                                    : group.members.length;
+
+                                final remaining =
+                                    group.members.length - displayCount;
+
+                                return Stack(
+                                  children: [
+                                    // Show first 3 members
+                                    ...List.generate(displayCount, (index) {
+                                      return Positioned(
+                                        left: index * 18.0,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: CircleAvatar(
+                                            radius: 12,
+                                            backgroundColor: AppColors.primary
+                                                .withOpacity(.2),
+                                            child: Text(
+                                              // getInitial(group.members[index]),
+                                              getAvatarText(
+                                                group.members[index],
+                                                currentUserId,
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+
+                                    // Show +N if more members
+                                    if (remaining > 0)
+                                      Positioned(
+                                        left: displayCount * 18.0,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: CircleAvatar(
+                                            radius: 12,
+                                            backgroundColor:
+                                                Colors.grey.shade300,
+                                            child: Text(
+                                              '+$remaining',
+                                              style: const TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
                             ),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: AppColors.primary.withOpacity(.2),
-                          child: Text(
-                            group.members[index].isNotEmpty
-                                ? group.members[index][0].toUpperCase()
-                                : '?',
+                          ),
+                          // SizedBox(
+                          //   height: 28,
+                          //   width: group.members.length > 3
+                          //       ? 70
+                          //       : (group.members.length * 20.0 + 8),
+                          //   child: Stack(
+                          //     children: List.generate(
+                          //       group.members.length > 3
+                          //           ? 3
+                          //           : group.members.length,
+                          //       (index) => Positioned(
+                          //         left: index * 18.0,
+                          //         child: Container(
+                          //           decoration: BoxDecoration(
+                          //             shape: BoxShape.circle,
+                          //             border: Border.all(
+                          //               color: Colors.white,
+                          //               width: 2,
+                          //             ),
+                          //           ),
+                          //           child: CircleAvatar(
+                          //             radius: 12,
+                          //             backgroundColor: AppColors.primary
+                          //                 .withOpacity(.2),
+                          //             child: Text(
+                          //               getInitial(group.members[index]),
+                          //               // group.members[index].isNotEmpty
+                          //               //     ? group.members[index][0]
+                          //               //           .toUpperCase()
+                          //               //     : '?',
+                          //               style: TextStyle(
+                          //                 fontSize: 10,
+                          //                 color: AppColors.primary,
+                          //                 fontWeight: FontWeight.bold,
+                          //               ),
+                          //             ),
+                          //           ),
+                          //         ),
+                          //       ),
+                          //     ),
+                          //   ),
+                          // ),
+                          Text(
+                            '${group.members.length} member${group.members.length != 1 ? 's' : ''}',
                             style: TextStyle(
-                              fontSize: 10,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ),
-              // Member count text
-              Text(
-                '${group.members.length} member${group.members.length != 1 ? 's' : ''}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          
-          
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -543,7 +651,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
       );
-    } else if (group.bannerImageUrl != null && group.bannerImageUrl!.isNotEmpty) {
+    } else if (group.bannerImageUrl != null &&
+        group.bannerImageUrl!.isNotEmpty) {
       return Image.network(
         group.bannerImageUrl!,
         fit: BoxFit.cover,
@@ -611,6 +720,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  // String getInitial(String value) {
+  //   if (value.isEmpty) return '?';
+
+  //   // If value is number like "6"
+  //   if (int.tryParse(value) != null) {
+  //     return 'U'; // fallback letter
+  //   }
+
+  //   return value[0].toUpperCase();
+  // }
+
+  String getAvatarText(String member, String currentUserId) {
+    // If this member is current user
+    if (member == currentUserId) {
+      return "Me";
+    }
+
+    if (member.isEmpty) return "?";
+
+    // Show first letter for others
+    return member[0].toUpperCase();
   }
 }
 
@@ -704,7 +836,9 @@ class _DashboardBottomBarState extends State<DashboardBottomBar> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive ? AppColors.primary : Colors.grey.shade500,
+                      color: isActive
+                          ? AppColors.primary
+                          : Colors.grey.shade500,
                     ),
                   ),
                 ],
@@ -735,10 +869,7 @@ class _NavItem {
 class QuickActions extends StatelessWidget {
   final VoidCallback onNewGroup;
 
-  const QuickActions({
-    super.key,
-    required this.onNewGroup,
-  });
+  const QuickActions({super.key, required this.onNewGroup});
 
   @override
   Widget build(BuildContext context) {

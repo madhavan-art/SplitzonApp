@@ -29,8 +29,8 @@ class SyncService {
     this.onMessage,
     this.onError,
     this.userId,
-  })  : _groupRepository = groupRepository ?? GroupRepository(),
-        _dbHelper = dbHelper ?? DatabaseHelper.instance;
+  }) : _groupRepository = groupRepository ?? GroupRepository(),
+       _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   void _log(String message) {
     debugPrint('🔄 SyncService: $message');
@@ -44,8 +44,9 @@ class SyncService {
 
   Future<bool> _isConnected() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 5));
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 5));
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;
@@ -85,14 +86,13 @@ class SyncService {
 
   // ── PUSH ONE GROUP TO BACKEND ─────────────────────────────
   Future<Map<String, dynamic>> _syncGroupToBackend(
-      Group group, String authToken) async {
+    Group group,
+    String authToken,
+  ) async {
     try {
       _log('Syncing group: ${group.name} (localId: ${group.id})');
 
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/create'),
-      );
+      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/create'));
 
       request.headers['Authorization'] = 'Bearer $authToken';
       request.fields['groupName'] = group.name;
@@ -103,15 +103,16 @@ class SyncService {
       request.fields['myShare'] = (group.myShare ?? 0).toString();
       request.fields['members'] = jsonEncode(group.members);
 
-      if (group.bannerImagePath != null &&
-          group.bannerImagePath!.isNotEmpty) {
+      if (group.bannerImagePath != null && group.bannerImagePath!.isNotEmpty) {
         final file = File(group.bannerImagePath!);
         if (await file.exists()) {
-          request.files.add(await http.MultipartFile.fromPath(
-            'banner',
-            group.bannerImagePath!,
-            contentType: MediaType('image', 'jpeg'),
-          ));
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'banner',
+              group.bannerImagePath!,
+              contentType: MediaType('image', 'jpeg'),
+            ),
+          );
         }
       }
 
@@ -184,7 +185,7 @@ class SyncService {
           for (final bg in backendGroups) {
             try {
               final group = Group(
-                id: bg['_id'] ?? bg['id'],   // ← MongoDB _id
+                id: bg['_id'] ?? bg['id'], // ← MongoDB _id
                 userId: userId!,
                 name: bg['groupName'],
                 description: bg['groupDescription'] ?? '',
@@ -232,13 +233,14 @@ class SyncService {
   // 2. Delete local PENDING copy
   // 3. Return success so GroupProvider knows to reload from SQLite
   Future<Map<String, dynamic>> syncGroupImmediately(
-      Group group, String authToken) async {
+    Group group,
+    String authToken,
+  ) async {
     return await _syncGroupToBackend(group, authToken);
   }
 
   // ── DELETE FROM BACKEND ───────────────────────────────────
-  Future<bool> deleteGroupFromBackend(
-      String groupId, String authToken) async {
+  Future<bool> deleteGroupFromBackend(String groupId, String authToken) async {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/delete/$groupId'),
