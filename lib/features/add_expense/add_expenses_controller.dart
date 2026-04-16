@@ -1,7 +1,3 @@
-// ════════════════════════════════════════════════════════════════
-// FILE: lib/features/add_expense/add_expenses_controller.dart
-// ════════════════════════════════════════════════════════════════
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:splitzon/data/models/expense_model.dart';
@@ -44,7 +40,6 @@ class AddExpenseController extends ChangeNotifier {
   String selectedCategory = 'General';
   bool isSaving = false;
 
-  // paidBy will be set to current user on init
   String paidByUserId = '';
   String paidByName = 'You';
 
@@ -113,7 +108,6 @@ class AddExpenseController extends ChangeNotifier {
     for (var m in members) m.percentage = p;
   }
 
-  /// Build MemberShare list from current state
   List<MemberShare> buildMemberShares() {
     return members.map((m) {
       double share = 0;
@@ -144,7 +138,6 @@ class AddExpenseController extends ChangeNotifier {
     }).toList();
   }
 
-  // ── VALIDATION ────────────────────────────────────────────
   bool validate(BuildContext context) {
     if (titleController.text.trim().isEmpty) {
       _snack(context, 'Enter a title');
@@ -175,7 +168,7 @@ class AddExpenseController extends ChangeNotifier {
     return true;
   }
 
-  // ── SAVE — goes through ExpenseProvider ──────────────────
+  // ── SAVE EXPENSE ─────────────────────────────────────────
   Future<void> saveExpense(BuildContext context) async {
     if (!validate(context)) return;
 
@@ -200,6 +193,9 @@ class AddExpenseController extends ChangeNotifier {
       notifyListeners();
 
       if (expense != null && context.mounted) {
+        // Refresh expense list so new expense appears immediately
+        await expenseProvider.loadExpenses(group.id);
+
         _snack(context, 'Expense saved successfully ✅', color: Colors.green);
         Navigator.pop(context);
       }
@@ -247,7 +243,6 @@ class AddExpenseController extends ChangeNotifier {
     super.dispose();
   }
 }
-
 // import 'package:flutter/material.dart';
 // import 'package:splitzon/data/models/group_model.dart';
 

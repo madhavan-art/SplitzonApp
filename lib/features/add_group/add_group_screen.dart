@@ -220,7 +220,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
             ),
             child: Text(
               '${_members.length} members',
-              style:  TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 color: AppColors.primary,
                 fontWeight: FontWeight.w600,
@@ -344,7 +344,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                               boxShadow: active
                                   ? [
                                       BoxShadow(
-                                        color: AppColors.primary.withOpacity(.3),
+                                        color: AppColors.primary.withOpacity(
+                                          .3,
+                                        ),
                                         blurRadius: 8,
                                         offset: const Offset(0, 3),
                                       ),
@@ -362,7 +364,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                               children: [
                                 Icon(
                                   icon,
-                                  color: active ? Colors.white : AppColors.primary,
+                                  color: active
+                                      ? Colors.white
+                                      : AppColors.primary,
                                   size: 26,
                                 ),
                                 const SizedBox(height: 6),
@@ -371,7 +375,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
-                                    color: active ? Colors.white : AppColors.textPrimary,
+                                    color: active
+                                        ? Colors.white
+                                        : AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -468,7 +474,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                             onTap: _openCurrencyPicker,
                             child: Container(
                               height: 50,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.primary.withOpacity(.08),
                                 borderRadius: BorderRadius.circular(12),
@@ -492,9 +500,10 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: _shareCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               style: TextStyle(
                                 fontSize: 15,
                                 color: AppColors.textSecondary,
@@ -525,7 +534,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.shade200,
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -536,11 +547,16 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                 ),
                                 errorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.red),
+                                  borderSide: const BorderSide(
+                                    color: Colors.red,
+                                  ),
                                 ),
                                 focusedErrorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                                  borderSide: const BorderSide(
+                                    color: Colors.red,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
@@ -570,7 +586,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                           ),
                           child: Text(
                             '${_members.length} added',
-                            style:  TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600,
@@ -586,7 +602,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: _memberNameCtrl,
-                              style:  TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textPrimary,
                               ),
@@ -608,7 +624,9 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.shade200,
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
@@ -649,10 +667,12 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                           children: _members.map((member) {
                             return Chip(
                               avatar: CircleAvatar(
-                                backgroundColor: AppColors.primary.withOpacity(.2),
+                                backgroundColor: AppColors.primary.withOpacity(
+                                  .2,
+                                ),
                                 child: Text(
                                   member[0].toUpperCase(),
-                                  style:  TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.bold,
@@ -661,7 +681,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                               ),
                               label: Text(
                                 member,
-                                style:  TextStyle(fontSize: 12),
+                                style: TextStyle(fontSize: 12),
                               ),
                               deleteIcon: const Icon(Icons.close, size: 16),
                               onDeleted: () => _removeMember(member),
@@ -750,9 +770,7 @@ class _BudgetHero extends StatelessWidget {
                                 fit: BoxFit.cover,
                               )
                             : const DecorationImage(
-                                image: NetworkImage(
-                                  '',
-                                ),
+                                image: NetworkImage(''),
                                 fit: BoxFit.cover,
                               ),
                       ),
@@ -900,7 +918,7 @@ class _BudgetHero extends StatelessWidget {
                     children: [
                       Text(
                         '${currency.code}  •  ${currency.name}',
-                        style:  TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
@@ -1161,7 +1179,7 @@ class _SectionCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style:  TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: AppColors.primary,
@@ -1203,7 +1221,7 @@ class _Field extends StatelessWidget {
     children: [
       Text(
         label,
-        style:  TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -1215,17 +1233,14 @@ class _Field extends StatelessWidget {
         validator: validator,
         maxLines: maxLines,
         minLines: minLines,
-        style:  TextStyle(
+        style: TextStyle(
           fontSize: 14,
           color: AppColors.textSecondary,
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.grey.shade400,
-            fontSize: 13,
-          ),
+          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
           prefixIcon: Icon(icon, size: 18, color: AppColors.primary),
           filled: true,
           fillColor: const Color(0xFFF5F9FF),
@@ -1243,10 +1258,7 @@ class _Field extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: AppColors.primary,
-              width: 1.5,
-            ),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),

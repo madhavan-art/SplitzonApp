@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/data/models/expense_model.dart';
 import 'package:splitzon/data/models/group_model.dart';
+import 'package:splitzon/features/Add_members/add_members_screen.dart';
 import 'package:splitzon/features/add_expense/add_expenses_screen.dart';
 import 'package:splitzon/features/gorup_dashboard/grp_dashboard_controller.dart';
 import 'package:splitzon/provider/user_providers.dart';
@@ -1010,15 +1011,25 @@ class _GroupDetailBottomBarState extends State<GroupDetailBottomBar> {
                   break;
 
                 case 1:
-                  // TODO: Navigate to Activity
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddMembersScreen(
+                        groupId: context
+                            .findAncestorWidgetOfExactType<GroupDetailScreen>()!
+                            .group
+                            .id,
+                      ),
+                    ),
+                  );
                   break;
 
                 case 2:
-                  // TODO: Navigate to Analytics
+                  // TODO: Navigate to Activity
                   break;
 
                 case 3:
-                  // TODO: Navigate to Profile
+                  // TODO: Navigate to Analytics
                   break;
               }
             },

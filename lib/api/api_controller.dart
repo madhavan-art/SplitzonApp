@@ -84,7 +84,8 @@ import 'package:flutter/foundation.dart';
 
 class ApiService {
   // Allow dynamic base URL for testing
-  static String baseUrl = "https://nonsterile-smudgeless-candace.ngrok-free.dev/api/auth";
+  static String baseUrl =
+      "https://nonsterile-smudgeless-candace.ngrok-free.dev/api/auth";
 
   // Set base URL dynamically (for testing different environments)
   static void setBaseUrl(String url) {
@@ -102,11 +103,8 @@ class ApiService {
   }) async {
     try {
       final url = Uri.parse('$baseUrl/$endpoint');
-      final requestHeaders = {
-        'Content-Type': 'application/json',
-        ...?headers,
-      };
-      
+      final requestHeaders = {'Content-Type': 'application/json', ...?headers};
+
       if (authToken != null) {
         requestHeaders['Authorization'] = 'Bearer $authToken';
       }
@@ -117,16 +115,24 @@ class ApiService {
       }
 
       late final http.Response response;
-      
+
       switch (method.toUpperCase()) {
         case 'GET':
           response = await http.get(url, headers: requestHeaders);
           break;
         case 'POST':
-          response = await http.post(url, headers: requestHeaders, body: jsonEncode(body));
+          response = await http.post(
+            url,
+            headers: requestHeaders,
+            body: jsonEncode(body),
+          );
           break;
         case 'PUT':
-          response = await http.put(url, headers: requestHeaders, body: jsonEncode(body));
+          response = await http.put(
+            url,
+            headers: requestHeaders,
+            body: jsonEncode(body),
+          );
           break;
         case 'DELETE':
           response = await http.delete(url, headers: requestHeaders);
@@ -145,7 +151,8 @@ class ApiService {
         // Return error structure
         return {
           'success': false,
-          'message': 'HTTP Error ${response.statusCode}: ${response.reasonPhrase}',
+          'message':
+              'HTTP Error ${response.statusCode}: ${response.reasonPhrase}',
           'status': response.statusCode,
           'error': response.body,
         };
@@ -153,7 +160,7 @@ class ApiService {
     } catch (e, stackTrace) {
       debugPrint('❌ API Error: $e');
       debugPrint('❌ Stack trace: $stackTrace');
-      
+
       return {
         'success': false,
         'message': 'Network error: $e',
