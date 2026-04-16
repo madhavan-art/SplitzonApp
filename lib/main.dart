@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:splitzon/features/Profile_page/profile_controller.dart';
 import 'package:splitzon/features/auth/auth_screen.dart';
 import 'package:splitzon/features/auth/login_screen.dart';
 import 'package:splitzon/features/home/home_screen.dart';
@@ -27,6 +28,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => UserProviders()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()), // ← NEW
+        ChangeNotifierProvider(create: (_) => ProfileController()),
       ],
       child: const MyApp(),
     ),

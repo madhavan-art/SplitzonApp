@@ -1,3 +1,4 @@
+// lib/data/models/user.dart (or wherever it is)
 import 'dart:convert';
 
 class User {
@@ -34,12 +35,8 @@ class User {
       'profile': profile,
     };
   }
-
-  String toJson() => json.encode(toMap());
-
-  factory User.fromJson(String source) =>
-      User.fromMap(json.decode(source) as Map<String, dynamic>);
 }
+
 // import 'dart:convert';
 
 // class User {
@@ -55,17 +52,15 @@ class User {
 //     required this.email,
 //     required this.phone,
 //     required this.profile,
-//     required String token,
 //   });
 
 //   factory User.fromMap(Map<String, dynamic> map) {
 //     return User(
-//       id: map['_id'] ?? '',
+//       id: map['_id'] ?? map['id'] ?? '',
 //       name: map['name'] ?? '',
 //       email: map['email'] ?? '',
 //       phone: map['phone'] ?? '',
-//       token: map['token'] ?? '',
-//       profile: map['profilePicture'] ?? '',
+//       profile: map['profilePicture'] ?? map['profile'] ?? '',
 //     );
 //   }
 
@@ -80,6 +75,7 @@ class User {
 //   }
 
 //   String toJson() => json.encode(toMap());
+
 //   factory User.fromJson(String source) =>
 //       User.fromMap(json.decode(source) as Map<String, dynamic>);
 // }

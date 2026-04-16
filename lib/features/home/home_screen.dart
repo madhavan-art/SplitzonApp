@@ -938,6 +938,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/core/utils/background_main_theme.dart';
+import 'package:splitzon/features/Profile_page/profile_screen.dart';
 import 'package:splitzon/features/add_group/add_group_screen.dart';
 import 'package:splitzon/features/gorup_dashboard/grp_dashboard_screen.dart';
 import 'package:splitzon/features/home/balance_card.dart';
@@ -1114,9 +1115,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                         // ✅ Replace with this:
                         GestureDetector(
-                          onTap: () => FirebaseAuthMethods(
-                            FirebaseAuth.instance,
-                          ).signOut(context),
+                          // onTap: () => FirebaseAuthMethods(
+                          //   FirebaseAuth.instance,
+                          // ).signOut(context),
+                          onTap: () {
+                            print("Profile Button Clicked");
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ProfileScreen(),
+                              ),
+                            );
+                          },
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: AppColors.primary.withOpacity(.15),
