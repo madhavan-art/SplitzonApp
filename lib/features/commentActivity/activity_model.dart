@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 class ActivityModel {
@@ -36,11 +37,31 @@ class ActivityModel {
       'userId': userId,
       'userName': userName,
       'timestamp': timestamp.toIso8601String(),
-      'metadata': metadata,
+      'metadata': metadata != null ? jsonEncode(metadata) : null,
     };
   }
 
   factory ActivityModel.fromMap(Map<String, dynamic> map) {
+    dynamic metadataValue = map['metadata'];
+    Map<String, dynamic>? parsedMetadata;
+
+    try {
+      if (metadataValue != null) {
+        if (metadataValue is String) {
+          // Proper JSON string - decode it
+          parsedMetadata = jsonDecode(metadataValue);
+        } else if (metadataValue is Map) {
+          // Already a Map (rare case)
+          parsedMetadata = Map<String, dynamic>.from(metadataValue);
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        '⚠️  Metadata parse failed, ignoring: $metadataValue | Error: $e',
+      );
+      parsedMetadata = null;
+    }
+
     return ActivityModel(
       id: map['id'] ?? '',
       type: map['type'] ?? '',
@@ -51,7 +72,7 @@ class ActivityModel {
       userId: map['userId'] ?? '',
       userName: map['userName'] ?? '',
       timestamp: DateTime.parse(map['timestamp']),
-      metadata: map['metadata'],
+      metadata: parsedMetadata,
     );
   }
 

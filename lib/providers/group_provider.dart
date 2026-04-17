@@ -229,16 +229,6 @@ class GroupProvider with ChangeNotifier {
       notifyListeners();
       _log('📱 Saved PENDING to SQLite → UI updated ✅');
 
-      // ✅ Log Group Created activity
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          final activityController = ActivityController();
-          await activityController.logGroupCreated(group.name, 'You');
-        } catch (e) {
-          _log('⚠️ Could not log group activity: $e');
-        }
-      });
-
       if (_authToken != null && _syncService != null) {
         final result = await _syncService!.syncGroupImmediately(
           group,

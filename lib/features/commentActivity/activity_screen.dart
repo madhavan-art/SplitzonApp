@@ -6,7 +6,9 @@ import 'package:splitzon/features/commentActivity/activity_controller.dart';
 import 'package:splitzon/features/commentActivity/activity_model.dart';
 
 class ActivityScreen extends StatefulWidget {
-  const ActivityScreen({super.key});
+  final String? groupId;
+  final String? groupName;
+  const ActivityScreen({super.key, this.groupId, this.groupName});
 
   @override
   State<ActivityScreen> createState() => _ActivityScreenState();
@@ -19,7 +21,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ActivityController>().initialize();
+      if (widget.groupId != null) {
+        context.read<ActivityController>().loadGroupActivities(widget.groupId!);
+      } else {
+        context.read<ActivityController>().initialize();
+      }
     });
 
     // Auto update timestamps every 30 seconds

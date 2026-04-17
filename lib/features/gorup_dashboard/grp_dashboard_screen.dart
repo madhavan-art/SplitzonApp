@@ -13,6 +13,7 @@ import 'package:splitzon/features/add_expense/add_expenses_screen.dart';
 import 'package:splitzon/features/gorup_dashboard/grp_dashboard_controller.dart';
 import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/providers/expense_provider.dart';
+import 'package:splitzon/features/commentActivity/activity_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final Group group;
@@ -1025,7 +1026,18 @@ class _GroupDetailBottomBarState extends State<GroupDetailBottomBar> {
                   break;
 
                 case 2:
-                  // TODO: Navigate to Activity
+                  final group = context
+                      .findAncestorWidgetOfExactType<GroupDetailScreen>()!
+                      .group;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ActivityScreen(
+                        groupId: group.id,
+                        groupName: group.name,
+                      ),
+                    ),
+                  );
                   break;
 
                 case 3:

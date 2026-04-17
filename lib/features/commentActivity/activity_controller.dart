@@ -19,18 +19,27 @@ class ActivityController with ChangeNotifier {
 
   // Initialize and load all activities
   Future<void> initialize() async {
+    _log('🔄 initialize() CALLED - Starting load activities');
     _isLoading = true;
     notifyListeners();
 
     try {
+      _log('📥 Calling dbHelper.getAllActivities()');
       // Load from SQLite
       _activities = await _dbHelper.getAllActivities();
-      _log('Loaded ${_activities.length} activities');
+      _log(
+        '✅ FINISHED: Loaded ${_activities.length} activities into controller',
+      );
+
+      for (var i = 0; i < _activities.length; i++) {
+        _log('📋 Controller Activity $i: ${_activities[i].title}');
+      }
     } catch (e) {
       debugPrint('❌ Failed to load activities: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
+      _log('🏁 initialize() COMPLETED');
     }
   }
 
@@ -45,6 +54,7 @@ class ActivityController with ChangeNotifier {
     required String userName,
     Map<String, dynamic>? metadata,
   }) async {
+    _log('➕ addActivity() called for: $title');
     try {
       final activity = ActivityModel(
         id: _uuid.v4(),
@@ -59,11 +69,14 @@ class ActivityController with ChangeNotifier {
         metadata: metadata,
       );
 
+      _log('💾 Saving to database...');
       await _dbHelper.insertActivity(activity);
+
+      _log('✅ Saved! Adding to in-memory list');
       _activities.insert(0, activity);
       notifyListeners();
 
-      _log('Added new activity: $title');
+      _log('✅ Activity added successfully: $title');
     } catch (e) {
       debugPrint('❌ Failed to add activity: $e');
     }
@@ -78,6 +91,34 @@ class ActivityController with ChangeNotifier {
       _log('Cleared all activities');
     } catch (e) {
       debugPrint('❌ Failed to clear activities: $e');
+    }
+  }
+
+  // Get activities for a specific group only
+  Future<List<ActivityModel>> getActivitiesForGroup(String groupId) async {
+    _log('📋 Loading activities for group: $groupId');
+    try {
+      return await _dbHelper.getActivitiesByGroupId(groupId);
+    } catch (e) {
+      debugPrint('❌ Failed to load group activities: $e');
+      return [];
+    }
+  }
+
+  // Load group activities directly into the controller state
+  Future<void> loadGroupActivities(String groupId) async {
+    _log('🔄 loadGroupActivities() CALLED for group: $groupId');
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      _activities = await getActivitiesForGroup(groupId);
+      _log('✅ FINISHED: Loaded ${_activities.length} activities for group');
+    } catch (e) {
+      debugPrint('❌ Failed to load group activities: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -153,12 +194,16 @@ class ActivityController with ChangeNotifier {
     );
   }
 
-  Future<void> logGroupCreated(String groupName, String createdBy) {
+  Future<void> logGroupCreated(
+    String groupId,
+    String groupName,
+    String createdBy,
+  ) {
     return addActivity(
       type: 'create',
       title: 'Group Created',
       description: '$createdBy created group "$groupName"',
-      groupId: '',
+      groupId: groupId,
       groupName: groupName,
       userId: '',
       userName: createdBy,

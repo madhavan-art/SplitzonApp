@@ -2,6 +2,7 @@
 // FILE: lib/data/local/database_helper.dart
 // ════════════════════════════════════════════════════════════════
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../model/user.dart';
@@ -25,7 +26,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 6, // ← bumped to 6 for activities table
+      version: 7, // ← bumped again to 7 to force upgrade
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -184,6 +185,26 @@ class DatabaseHelper {
         )
       ''');
     }
+
+    if (oldVersion < 7) {
+      // Recreate activities table properly
+      await db.execute('DROP TABLE IF EXISTS activities');
+      await db.execute('''
+        CREATE TABLE activities (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          groupId TEXT NOT NULL DEFAULT "",
+          groupName TEXT NOT NULL DEFAULT "",
+          userId TEXT NOT NULL DEFAULT "",
+          userName TEXT NOT NULL DEFAULT "",
+          timestamp TEXT NOT NULL,
+          metadata TEXT
+        )
+      ''');
+      // Removed debug print
+    }
   }
 
   // ════════════════════════════════════════════════════════════
@@ -336,22 +357,53 @@ class DatabaseHelper {
 
   Future<void> insertActivity(ActivityModel activity) async {
     final db = await database;
-    await db.insert(
+    debugPrint(
+      '💾 DB: Inserting activity: ${activity.title} | ID: ${activity.id}',
+    );
+    final result = await db.insert(
       'activities',
       activity.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    debugPrint('💾 DB: Insert result: $result');
   }
 
   Future<List<ActivityModel>> getAllActivities() async {
     final db = await database;
+    debugPrint('💾 DB: Fetching all activities...');
     final maps = await db.query('activities', orderBy: 'timestamp DESC');
+    debugPrint('💾 DB: Found ${maps.length} activities in database');
+
+    for (var i = 0; i < maps.length; i++) {
+      debugPrint(
+        '💾 DB Activity $i: ${maps[i]['title']} | ${maps[i]['timestamp']}',
+      );
+    }
+
     return maps.map((m) => ActivityModel.fromMap(m)).toList();
   }
 
   Future<void> clearAllActivities() async {
     final db = await database;
-    await db.delete('activities');
+    debugPrint(
+      '⚠️  DB: CLEARING ALL ACTIVITIES!!! Stack trace: ${StackTrace.current}',
+    );
+    final count = await db.delete('activities');
+    debugPrint('⚠️  DB: Deleted $count activities');
+  }
+
+  /// Get all activities filtered for a specific groupId only
+  Future<List<ActivityModel>> getActivitiesByGroupId(String groupId) async {
+    final db = await database;
+    debugPrint('💾 DB: Fetching activities for group: $groupId');
+    final maps = await db.query(
+      'activities',
+      where: 'groupId = ?',
+      whereArgs: [groupId],
+      orderBy: 'timestamp DESC',
+    );
+    debugPrint('💾 DB: Found ${maps.length} activities for this group');
+    return maps.map((m) => ActivityModel.fromMap(m)).toList();
   }
 
   Future close() async {

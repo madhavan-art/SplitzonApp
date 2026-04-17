@@ -46,8 +46,12 @@ class ProfileController extends ChangeNotifier {
   String get lastError => _lastError;
 
   // ─────────────────────────────────────────────────────────
-  void _log(String m) => debugPrint('👤 ProfileController: $m');
-  void _err(String m) => debugPrint('❌ ProfileController: $m');
+  void _log(String m) {
+    // debugPrint('👤 ProfileController: $m');
+  }
+  void _err(String m) {
+    // debugPrint('❌ ProfileController: $m');
+  }
 
   // ─────────────────────────────────────────────────────────
   // INIT — called once when ProfileScreen opens
@@ -58,9 +62,9 @@ class ProfileController extends ChangeNotifier {
     final userProvider = Provider.of<UserProviders>(context, listen: false);
     if (userProvider.user != null) {
       _user = UserModel.fromMap(userProvider.user!.toMap());
-      _log('Initialized from UserProviders: ${_user.name}');
+      // _log('Initialized from UserProviders: ${_user.name}');
     } else {
-      _log('No user in UserProviders — using guest');
+      // _log('No user in UserProviders — using guest');
     }
     notifyListeners();
   }

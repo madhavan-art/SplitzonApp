@@ -15,11 +15,11 @@ class ProfileSyncService {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
   void _log(String message) {
-    debugPrint('👤 ProfileSyncService: $message');
+    // debugPrint('👤 ProfileSyncService: $message');
   }
 
   void _logError(String error) {
-    debugPrint('❌ ProfileSyncService Error: $error');
+    // debugPrint('❌ ProfileSyncService Error: $error');
   }
 
   Future<bool> _isConnected() async {

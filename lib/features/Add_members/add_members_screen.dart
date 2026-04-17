@@ -179,7 +179,7 @@ class _AddMembersView extends StatelessWidget {
       floatingActionButton: controller.selectedUsers.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () async {
-                final success = await controller.addAllSelectedMembers();
+                final success = await controller.addAllSelectedMembers(context);
                 if (!context.mounted) return;
 
                 if (success) {

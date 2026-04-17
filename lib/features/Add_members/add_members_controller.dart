@@ -1,9 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:splitzon/api/api_controller.dart';
 import 'package:splitzon/data/repositories/group_repository.dart';
 import 'package:splitzon/services/storage_service.dart';
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
+import 'package:splitzon/providers/group_provider.dart';
+import 'package:splitzon/provider/user_providers.dart';
 
 class SearchedUser {
   final String id;
@@ -129,15 +134,38 @@ class AddMembersController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> addAllSelectedMembers() async {
+  Future<bool> addAllSelectedMembers(BuildContext context) async {
     if (selectedUsers.isEmpty) return false;
 
     debugPrint('🚀 Adding ${selectedUsers.length} members to group...');
 
     try {
+      // Get group name first
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final group = groupProvider.groups.firstWhere((g) => g.id == groupId);
+
+      // Get current user name
+      final userProvider = Provider.of<UserProviders>(context, listen: false);
+      final currentUserName = userProvider.user?.name ?? 'You';
+
+      final activityController = Provider.of<ActivityController>(
+        context,
+        listen: false,
+      );
+
       for (final user in selectedUsers) {
         await _groupRepository.addMember(groupId: groupId, memberId: user.id);
         debugPrint('✅ Added: ${user.name}');
+
+        // ✅ Log activity for each member added
+        await activityController.logMemberAdded(
+          user.name,
+          groupId,
+          group.name,
+          currentUserName,
+        );
+
+        debugPrint('📋 Activity logged for member: ${user.name}');
       }
 
       await _groupRepository.syncGroupMembers(groupId);

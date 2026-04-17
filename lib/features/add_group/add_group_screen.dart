@@ -136,7 +136,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
     setState(() => _isSaving = true);
     try {
       // Create group via Provider (saves to SQLite)
-      await context.read<GroupProvider>().createGroup(
+      final createdGroup = await context.read<GroupProvider>().createGroup(
         name: _titleCtrl.text.trim(),
         description: _subtitleCtrl.text.trim(),
         groupType: _selectedType,
@@ -148,11 +148,17 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
       );
 
       // ✅ Log Group Created activity
-      try {
-        final activityController = context.read<ActivityController>();
-        await activityController.logGroupCreated(_titleCtrl.text.trim(), 'You');
-      } catch (e) {
-        debugPrint('⚠️ Could not log activity: $e');
+      if (createdGroup != null) {
+        try {
+          final activityController = context.read<ActivityController>();
+          await activityController.logGroupCreated(
+            createdGroup.id,
+            _titleCtrl.text.trim(),
+            'You',
+          );
+        } catch (e) {
+          debugPrint('⚠️ Could not log activity: $e');
+        }
       }
 
       setState(() => _isSaving = false);
