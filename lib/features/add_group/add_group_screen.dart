@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/core/utils/background_main_theme.dart';
 import 'package:splitzon/providers/group_provider.dart';
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CURRENCY DATA
@@ -145,6 +146,14 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
         members: _members,
         bannerImagePath: _pickedImage?.path,
       );
+
+      // ✅ Log Group Created activity
+      try {
+        final activityController = context.read<ActivityController>();
+        await activityController.logGroupCreated(_titleCtrl.text.trim(), 'You');
+      } catch (e) {
+        debugPrint('⚠️ Could not log activity: $e');
+      }
 
       setState(() => _isSaving = false);
       if (!mounted) return;
