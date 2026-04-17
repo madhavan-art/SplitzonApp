@@ -7,6 +7,7 @@ class User {
   final String email;
   final String phone;
   final String profile;
+  final String syncStatus;
 
   User({
     required this.id,
@@ -14,6 +15,7 @@ class User {
     required this.email,
     required this.phone,
     required this.profile,
+    this.syncStatus = 'SYNCED',
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
@@ -23,6 +25,7 @@ class User {
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
       profile: map['profilePicture'] ?? map['profile'] ?? '',
+      syncStatus: map['syncStatus'] ?? 'SYNCED',
     );
   }
 
@@ -33,7 +36,26 @@ class User {
       'email': email,
       'phone': phone,
       'profile': profile,
+      'syncStatus': syncStatus,
     };
+  }
+
+  User copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? profile,
+    String? syncStatus,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      profile: profile ?? this.profile,
+      syncStatus: syncStatus ?? this.syncStatus,
+    );
   }
 }
 

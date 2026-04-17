@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../providers/group_provider.dart';
+import 'profilesyncservice.dart';
 
 /// Watches internet connectivity.
 /// When internet comes BACK, automatically syncs all PENDING groups.
@@ -33,7 +34,9 @@ class ConnectivityService {
         if (_wasOffline) {
           // Just came back online — trigger sync!
           _wasOffline = false;
-          debugPrint('📡 ConnectivityService: back ONLINE — syncing pending...');
+          debugPrint(
+            '📡 ConnectivityService: back ONLINE — syncing pending...',
+          );
           await _syncPending();
         }
       }
@@ -55,20 +58,23 @@ class ConnectivityService {
     final provider = _groupProvider;
     if (provider == null) return;
 
+    // Sync pending groups
     final pending = provider.getPendingGroups();
-    if (pending.isEmpty) {
-      debugPrint('📡 No pending groups to sync');
-      return;
+    if (pending.isNotEmpty) {
+      debugPrint('📡 Syncing ${pending.length} pending group(s)...');
+      await provider.syncWithBackend();
     }
 
-    debugPrint('📡 Syncing ${pending.length} pending group(s)...');
-    await provider.syncWithBackend();
+    // Sync pending profile changes
+    debugPrint('📡 Syncing pending profile changes...');
+    await ProfileSyncService().onConnectivityRestored();
   }
 
   Future<bool> _isConnected() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 5));
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 5));
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;

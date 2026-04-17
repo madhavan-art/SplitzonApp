@@ -76,35 +76,14 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
     final ctrl = context.read<ProfileController>();
     bool success = false;
 
-    if (_selectedImage != null) {
-      // ── Upload profile picture ────────────────────────────
-      debugPrint('📸 Saving profile picture...');
-      success = await ctrl.updateProfilePicture(
-        context: context, // ✅ pass context as parameter
-        imageFile: _selectedImage!,
-      );
-
-      // Also save text fields if they changed
-      if (success &&
-          (_nameController.text.trim() != ctrl.user.name ||
-              _emailController.text.trim() != ctrl.user.email)) {
-        success = await ctrl.updatePersonalInfo(
-          context: context,
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          phone: ctrl.user.phone,
-        );
-      }
-    } else {
-      // ── Update text fields only ───────────────────────────
-      debugPrint('💾 Saving name/email...');
-      success = await ctrl.updatePersonalInfo(
-        context: context, // ✅ pass context as parameter
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: ctrl.user.phone,
-      );
-    }
+    // ── Update name/email only ───────────────────────────
+    debugPrint('💾 Saving name/email...');
+    success = await ctrl.updatePersonalInfo(
+      context: context, // ✅ pass context as parameter
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+      phone: ctrl.user.phone,
+    );
 
     setState(() => _isSaving = false);
 

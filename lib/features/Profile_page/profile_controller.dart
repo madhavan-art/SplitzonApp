@@ -24,9 +24,11 @@ import 'package:splitzon/features/Profile_page/profile_model.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:splitzon/model/user.dart' as app_user;
 import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/services/storage_service.dart';
 import 'package:splitzon/api/api_controller.dart';
+import 'package:splitzon/services/profilesyncservice.dart';
 
 class ProfileController extends ChangeNotifier {
   UserModel _user = UserModel(
@@ -107,41 +109,30 @@ class ProfileController extends ChangeNotifier {
       await userProvider.updateUserProfile(name, email, phone);
       _log('UserProviders updated ✅');
 
-      // ── Step 3: Call backend ──────────────────────────────
-      final response = await http.put(
-        Uri.parse(
-          '${ApiService.baseUrl.replaceAll('/auth', '/auth')}/users/profile',
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'name': name, 'email': email, 'phone': phone}),
-      );
+      // ── Step 3: Sync with backend using ProfileSyncService ───────────
+      final currentUser = userProvider.user;
 
-      _log('Backend response: ${response.statusCode}');
+      if (currentUser != null) {
+        final syncResult = await ProfileSyncService().syncProfileImmediately(
+          app_user.User(
+            id: currentUser.id,
+            name: name,
+            email: email,
+            phone: phone,
+            profile: currentUser.profile,
+          ),
+        );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          _log('Backend update successful ✅');
-          _isLoading = false;
-          notifyListeners();
-          return true;
-        } else {
-          _lastError = data['message'] ?? 'Backend update failed';
-          _err(_lastError);
+        _log('Sync result: $syncResult');
+
+        if (syncResult['offline'] == true) {
+          _log('Profile will be synced when online ✅');
         }
-      } else {
-        _lastError = 'Server error: ${response.statusCode}';
-        _err(_lastError);
       }
 
-      // Backend failed but local/SharedPreferences already updated
-      // Return true so UI doesn't show an error for offline case
       _isLoading = false;
       notifyListeners();
-      return true; // ← local update succeeded, backend will sync later
+      return true;
     } catch (e) {
       // Network error — local state already updated
       _log('Network error (offline mode): $e — local update kept ✅');
@@ -149,88 +140,6 @@ class ProfileController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true; // ← show success, local data is updated
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // UPDATE PROFILE PICTURE
-  // ─────────────────────────────────────────────────────────
-  Future<bool> updateProfilePicture({
-    required BuildContext context, // ✅ passed as parameter
-    required File imageFile,
-  }) async {
-    _isLoading = true;
-    _lastError = '';
-    notifyListeners();
-
-    _log('Uploading profile picture: ${imageFile.path}');
-
-    try {
-      final token = await StorageService.getToken();
-      if (token == null) {
-        _lastError = 'Not authenticated';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      var request = http.MultipartRequest(
-        'PUT',
-        Uri.parse(
-          '${ApiService.baseUrl.replaceAll('/auth', '')}/auth/users/profile-picture',
-        ),
-      );
-
-      request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(
-        await http.MultipartFile.fromPath('profilePicture', imageFile.path),
-      );
-
-      _log('Sending multipart request...');
-      final streamed = await request.send();
-      final response = await http.Response.fromStream(streamed);
-
-      _log('Response: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          final newUrl = data['profilePicture'] as String? ?? '';
-          _log('Profile picture uploaded: $newUrl ✅');
-
-          // Update local state
-          _user.profilePicture = newUrl;
-          notifyListeners();
-
-          // Update UserProviders + SharedPreferences
-          final userProvider = Provider.of<UserProviders>(
-            context,
-            listen: false,
-          );
-          await userProvider.updateUserProfilePicture(newUrl);
-          _log('UserProviders profile picture updated ✅');
-
-          _isLoading = false;
-          notifyListeners();
-          return true;
-        } else {
-          _lastError = data['message'] ?? 'Upload failed';
-          _err(_lastError);
-        }
-      } else {
-        _lastError = 'Upload failed: ${response.statusCode}';
-        _err(_lastError);
-      }
-
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _err('Upload exception: $e');
-      _lastError = 'Network error — try again when online';
-      _isLoading = false;
-      notifyListeners();
-      return false;
     }
   }
 

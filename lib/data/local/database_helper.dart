@@ -4,6 +4,7 @@
 
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../../model/user.dart';
 import '../models/group_model.dart';
 import '../models/expense_model.dart';
 
@@ -23,7 +24,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 4, // ← bumped to 4 for expenses table
+      version: 5, // ← bumped to 5 for users table
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -66,6 +67,18 @@ class DatabaseHelper {
         splitType TEXT DEFAULT "equal",
         memberShares TEXT DEFAULT "[]",
         syncStatus TEXT NOT NULL DEFAULT "PENDING"
+      )
+    ''');
+
+    // ── USERS TABLE ───────────────────────────────────────────
+    await db.execute('''
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        profile TEXT DEFAULT "",
+        syncStatus TEXT NOT NULL DEFAULT "SYNCED"
       )
     ''');
   }
@@ -119,6 +132,20 @@ class DatabaseHelper {
           splitType TEXT DEFAULT "equal",
           memberShares TEXT DEFAULT "[]",
           syncStatus TEXT NOT NULL DEFAULT "PENDING"
+        )
+      ''');
+    }
+
+    if (oldVersion < 5) {
+      // Add users table for profile sync
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          profile TEXT DEFAULT "",
+          syncStatus TEXT NOT NULL DEFAULT "SYNCED"
         )
       ''');
     }
@@ -246,6 +273,26 @@ class DatabaseHelper {
   Future<void> deleteExpensesByGroup(String groupId) async {
     final db = await database;
     await db.delete('expenses', where: 'groupId = ?', whereArgs: [groupId]);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // USER METHODS
+  // ════════════════════════════════════════════════════════════
+
+  Future<void> insertOrUpdateUser(User user) async {
+    final db = await database;
+    await db.insert(
+      'users',
+      user.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<User?> getCurrentUser() async {
+    final db = await database;
+    final maps = await db.query('users', limit: 1);
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
   }
 
   Future close() async {
