@@ -942,6 +942,8 @@ import 'package:splitzon/features/Profile_page/profile_screen.dart';
 import 'package:splitzon/features/add_group/add_group_screen.dart';
 import 'package:splitzon/features/gorup_dashboard/grp_dashboard_screen.dart';
 import 'package:splitzon/features/home/balance_card.dart';
+import 'package:splitzon/features/commentActivity/activity_screen.dart';
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
 import 'package:splitzon/providers/group_provider.dart';
 import 'package:splitzon/services/firebase_auth.dart';
 import 'package:splitzon/provider/user_providers.dart';
@@ -981,6 +983,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Load groups from Provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GroupProvider>().initialize();
+      context.read<ActivityController>().initialize();
     });
   }
 
@@ -1032,254 +1035,350 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  int _selectedNavIndex = 0;
+
   @override
   Widget build(BuildContext context) {
-    // final userProvider = context.watch<UserProviders>();
-    // final userName = userProvider.user?.name ?? 'User';
     final userProvider = context.watch<UserProviders>();
-
-    print("===== USER PROVIDER =====");
-    print(userProvider.user);
-    print("User name:");
-    print(userProvider.user?.name);
-
     final userName = userProvider.user?.name ?? 'User';
+
     return Consumer<GroupProvider>(
       builder: (context, groupProvider, child) {
         final mq = MediaQuery.of(context);
         final sw = mq.size.width;
         final hPad = sw * 0.05;
 
-        final groups = groupProvider.groups;
-        final visibleGroups = _showAll
-            ? groups
-            : groups.take(_initialCount).toList();
+        // Pages for bottom navigation
+        final List<Widget> pages = [
+          // Home Page
+          _buildHomePage(userName, sw, hPad, groupProvider),
+          // Activity Page
+          const ActivityScreen(),
+          // Analytics Page
+          _buildAnalyticsPage(),
+          // Profile Page
+          const ProfileScreen(),
+        ];
 
         return Scaffold(
           extendBody: true,
-          floatingActionButton: FloatingActionButton(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            onPressed: _openAddGroup,
-            child: const Icon(Icons.add),
-          ),
+          floatingActionButton: _selectedNavIndex == 0
+              ? FloatingActionButton(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  onPressed: _openAddGroup,
+                  child: const Icon(Icons.add),
+                )
+              : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-          bottomNavigationBar: const DashboardBottomBar(),
+          bottomNavigationBar: _buildBottomNav(),
           body: BackgroundMainTheme(
-            child: SafeArea(
-              child: Column(
-                children: [
-                  // ── FIXED PINNED HEADER ──────────────────────────────
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: hPad,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.9),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Menu icon with bg
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.menu,
-                            color: AppColors.primary,
-                            size: 22,
-                          ),
-                        ),
-                        // App name
-                        Text(
-                          'Splitzon',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        // Profile icon with bg
+            child: IndexedStack(index: _selectedNavIndex, children: pages),
+          ),
+        );
+      },
+    );
+  }
 
-                        // ✅ Replace with this:
-                        GestureDetector(
-                          // onTap: () => FirebaseAuthMethods(
-                          //   FirebaseAuth.instance,
-                          // ).signOut(context),
-                          onTap: () {
-                            print("Profile Button Clicked");
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ProfileScreen(),
-                              ),
-                            );
-                          },
-                          child: CircleAvatar(
-                            radius: 18,
-                            backgroundColor: AppColors.primary.withOpacity(.15),
-                            // child: const Icon(
-                            //   Icons.person,
-                            //   color: AppColors.primary,
-                            //   size: 20,
-                            // ),
-                            child: Text(
-                              userName.isNotEmpty
-                                  ? userName[0].toUpperCase()
-                                  : 'U',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+  Widget _buildHomePage(
+    String userName,
+    double sw,
+    double hPad,
+    GroupProvider groupProvider,
+  ) {
+    final groups = groupProvider.groups;
+    final visibleGroups = _showAll
+        ? groups
+        : groups.take(_initialCount).toList();
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // ── FIXED PINNED HEADER ──────────────────────────────
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.9),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.menu,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                Text(
+                  'Splitzon',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppColors.primary.withOpacity(.15),
+                  child: Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── SCROLLABLE CONTENT ───────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+
+                  // Greeting
+                  Text(
+                    'Hi, $userName 👋',
+                    style: TextStyle(
+                      fontSize: sw < 360 ? 18 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    "Let's review your expenses",
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: sw < 360 ? 12 : 14,
                     ),
                   ),
 
-                  // ── SCROLLABLE CONTENT ───────────────────────────────
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(horizontal: hPad),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-                          // Greeting
-                          Text(
-                            'Hi, $userName 👋',
-                            style: TextStyle(
-                              fontSize: sw < 360 ? 18 : 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            "Let's review your expenses",
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: sw < 360 ? 12 : 14,
-                            ),
-                          ),
+                  // Balance card
+                  const BalanceCard(),
 
-                          const SizedBox(height: 20),
+                  const SizedBox(height: 25),
 
-                          // Balance card
-                          const BalanceCard(),
+                  // Quick insights
+                  const Text(
+                    'Quick Insights',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.primary,
+                    ),
+                  ),
 
-                          const SizedBox(height: 25),
+                  const SizedBox(height: 15),
 
-                          // Quick insights
-                          const Text(
-                            'Quick Insights',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: AppColors.primary,
-                            ),
-                          ),
+                  QuickActions(onNewGroup: _openAddGroup),
+                  const SizedBox(height: 25),
 
-                          const SizedBox(height: 15),
-
-                          QuickActions(onNewGroup: _openAddGroup),
-                          const SizedBox(height: 25),
-
-                          /// GROUPS HEADER
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Groups',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              if (groups.length > _initialCount)
-                                Row(
-                                  children: [
-                                    Text(
-                                      'See More',
-                                      style: TextStyle(
-                                        color: AppColors.primary.withOpacity(
-                                          .8,
-                                        ),
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      color: AppColors.primary.withOpacity(.8),
-                                      size: 18,
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 15),
-
-                          /// ✅ DYNAMIC GROUP LIST from Provider
-                          if (groupProvider.isLoading)
-                            const Center(child: CircularProgressIndicator())
-                          else if (groups.isEmpty)
-                            _buildEmptyState()
-                          else
-                            ...visibleGroups.map(
-                              (group) => _buildGroupCard(group),
-                            ),
-
-                          const SizedBox(height: 10),
-
-                          /// ✅ SEE MORE / SEE LESS BUTTON AT BOTTOM
-                          if (!groupProvider.isLoading &&
-                              groups.length > _initialCount)
-                            Center(
-                              child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    setState(() => _showAll = !_showAll),
-                                icon: Icon(
-                                  _showAll
-                                      ? Icons.keyboard_arrow_up_rounded
-                                      : Icons.keyboard_arrow_down_rounded,
-                                ),
-                                label: Text(_showAll ? 'See Less' : 'See More'),
-                                style: OutlinedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 10,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                          const SizedBox(height: 120),
-                        ],
+                  /// GROUPS HEADER
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Groups',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppColors.primary,
+                        ),
                       ),
+                      if (groups.length > _initialCount)
+                        Row(
+                          children: [
+                            Text(
+                              'See More',
+                              style: TextStyle(
+                                color: AppColors.primary.withOpacity(.8),
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: AppColors.primary.withOpacity(.8),
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+
+                  /// ✅ DYNAMIC GROUP LIST from Provider
+                  if (groupProvider.isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (groups.isEmpty)
+                    _buildEmptyState()
+                  else
+                    ...visibleGroups.map((group) => _buildGroupCard(group)),
+
+                  const SizedBox(height: 10),
+
+                  /// ✅ SEE MORE / SEE LESS BUTTON AT BOTTOM
+                  if (!groupProvider.isLoading && groups.length > _initialCount)
+                    Center(
+                      child: OutlinedButton.icon(
+                        onPressed: () => setState(() => _showAll = !_showAll),
+                        icon: Icon(
+                          _showAll
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                        ),
+                        label: Text(_showAll ? 'See Less' : 'See More'),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 120),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsPage() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'Analytics',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text('Coming Soon', style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    final items = [
+      _NavItem(
+        icon: Icons.home_outlined,
+        activeIcon: Icons.home_rounded,
+        label: 'Home',
+      ),
+      _NavItem(
+        icon: Icons.access_time_outlined,
+        activeIcon: Icons.access_time_filled,
+        label: 'Activity',
+      ),
+      _NavItem(
+        icon: Icons.bar_chart_outlined,
+        activeIcon: Icons.bar_chart_rounded,
+        label: 'Analytics',
+      ),
+      _NavItem(
+        icon: Icons.person_outline,
+        activeIcon: Icons.person_rounded,
+        label: 'Profile',
+      ),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(.2),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(.08),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(items.length, (index) {
+          final item = items[index];
+          final isActive = _selectedNavIndex == index;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() => _selectedNavIndex = index);
+            },
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? AppColors.primary.withOpacity(.1)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isActive ? item.activeIcon : item.icon,
+                    color: isActive ? AppColors.primary : Colors.grey.shade500,
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive
+                          ? AppColors.primary
+                          : Colors.grey.shade500,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        );
-      },
+          );
+        }),
+      ),
     );
   }
 
@@ -1690,111 +1789,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// ─────────────────────────────────────────
-// BOTTOM BAR
-// ─────────────────────────────────────────
-
-class DashboardBottomBar extends StatefulWidget {
-  const DashboardBottomBar({super.key});
-
-  @override
-  State<DashboardBottomBar> createState() => _DashboardBottomBarState();
-}
-
-class _DashboardBottomBarState extends State<DashboardBottomBar> {
-  int _currentIndex = 0;
-
-  final List<_NavItem> _items = const [
-    _NavItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
-      label: 'Home',
-    ),
-    _NavItem(
-      icon: Icons.people_outline,
-      activeIcon: Icons.people_rounded,
-      label: 'Friends',
-    ),
-    _NavItem(
-      icon: Icons.bar_chart_outlined,
-      activeIcon: Icons.bar_chart_rounded,
-      label: 'Activity',
-    ),
-    _NavItem(
-      icon: Icons.person_outline,
-      activeIcon: Icons.person_rounded,
-      label: 'Profile',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24), // ✅ floating effect
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(.2),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(.08),
-            blurRadius: 20,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(_items.length, (index) {
-          final item = _items[index];
-          final isActive = _currentIndex == index;
-
-          return GestureDetector(
-            onTap: () => setState(() => _currentIndex = index),
-            behavior: HitTestBehavior.opaque,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primary.withOpacity(.1)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isActive ? item.activeIcon : item.icon,
-                    color: isActive ? AppColors.primary : Colors.grey.shade500,
-                    size: 24,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive
-                          ? AppColors.primary
-                          : Colors.grey.shade500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
 class _NavItem {
   final IconData icon;
   final IconData activeIcon;
@@ -1805,6 +1799,10 @@ class _NavItem {
     required this.label,
   });
 }
+
+// ─────────────────────────────────────────
+// BOTTOM BAR
+// ─────────────────────────────────────────
 
 // ─────────────────────────────────────────
 // QUICK ACTIONS

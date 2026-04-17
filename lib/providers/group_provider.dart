@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import '../data/repositories/group_repository.dart';
 import '../data/models/group_model.dart';
 import '../services/sync_service.dart';
+import '../features/commentActivity/activity_controller.dart';
 
 class GroupProvider with ChangeNotifier {
   final GroupRepository _groupRepository;
@@ -227,6 +228,16 @@ class GroupProvider with ChangeNotifier {
       _groups.insert(0, group);
       notifyListeners();
       _log('📱 Saved PENDING to SQLite → UI updated ✅');
+
+      // ✅ Log Group Created activity
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          final activityController = ActivityController();
+          await activityController.logGroupCreated(group.name, 'You');
+        } catch (e) {
+          _log('⚠️ Could not log group activity: $e');
+        }
+      });
 
       if (_authToken != null && _syncService != null) {
         final result = await _syncService!.syncGroupImmediately(

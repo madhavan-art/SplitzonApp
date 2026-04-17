@@ -4,6 +4,7 @@ import 'package:splitzon/data/models/expense_model.dart';
 import 'package:splitzon/data/models/group_model.dart';
 import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/providers/expense_provider.dart';
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
 
 enum SplitType { equal, percentage, share }
 
@@ -195,6 +196,16 @@ class AddExpenseController extends ChangeNotifier {
       if (expense != null && context.mounted) {
         // Refresh expense list so new expense appears immediately
         await expenseProvider.loadExpenses(group.id);
+
+        // Log activity
+        final activityController = context.read<ActivityController>();
+        await activityController.logExpenseAdded(
+          titleController.text.trim(),
+          group.id,
+          group.name,
+          paidByName,
+          totalAmount,
+        );
 
         _snack(context, 'Expense saved successfully ✅', color: Colors.green);
         Navigator.pop(context);

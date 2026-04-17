@@ -7,6 +7,7 @@ import 'package:path/path.dart';
 import '../../model/user.dart';
 import '../models/group_model.dart';
 import '../models/expense_model.dart';
+import '../../features/commentActivity/activity_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -24,7 +25,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 5, // ← bumped to 5 for users table
+      version: 6, // ← bumped to 6 for activities table
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -79,6 +80,22 @@ class DatabaseHelper {
         phone TEXT NOT NULL,
         profile TEXT DEFAULT "",
         syncStatus TEXT NOT NULL DEFAULT "SYNCED"
+      )
+    ''');
+
+    // ── ACTIVITIES TABLE ───────────────────────────────────────
+    await db.execute('''
+      CREATE TABLE activities (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        groupId TEXT NOT NULL DEFAULT "",
+        groupName TEXT NOT NULL DEFAULT "",
+        userId TEXT NOT NULL DEFAULT "",
+        userName TEXT NOT NULL DEFAULT "",
+        timestamp TEXT NOT NULL,
+        metadata TEXT
       )
     ''');
   }
@@ -146,6 +163,24 @@ class DatabaseHelper {
           phone TEXT NOT NULL,
           profile TEXT DEFAULT "",
           syncStatus TEXT NOT NULL DEFAULT "SYNCED"
+        )
+      ''');
+    }
+
+    if (oldVersion < 6) {
+      // Add activities table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS activities (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          groupId TEXT NOT NULL DEFAULT "",
+          groupName TEXT NOT NULL DEFAULT "",
+          userId TEXT NOT NULL DEFAULT "",
+          userName TEXT NOT NULL DEFAULT "",
+          timestamp TEXT NOT NULL,
+          metadata TEXT
         )
       ''');
     }
@@ -293,6 +328,30 @@ class DatabaseHelper {
     final maps = await db.query('users', limit: 1);
     if (maps.isEmpty) return null;
     return User.fromMap(maps.first);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // ACTIVITY METHODS
+  // ════════════════════════════════════════════════════════════
+
+  Future<void> insertActivity(ActivityModel activity) async {
+    final db = await database;
+    await db.insert(
+      'activities',
+      activity.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<ActivityModel>> getAllActivities() async {
+    final db = await database;
+    final maps = await db.query('activities', orderBy: 'timestamp DESC');
+    return maps.map((m) => ActivityModel.fromMap(m)).toList();
+  }
+
+  Future<void> clearAllActivities() async {
+    final db = await database;
+    await db.delete('activities');
   }
 
   Future close() async {

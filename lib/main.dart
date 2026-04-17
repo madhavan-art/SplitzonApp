@@ -17,6 +17,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/providers/group_provider.dart';
 import 'package:splitzon/providers/expense_provider.dart'; // ← NEW
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
 import 'services/firebase_options.dart';
 
 void main() async {
@@ -29,6 +30,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()), // ← NEW
         ChangeNotifierProvider(create: (_) => ProfileController()),
+        ChangeNotifierProvider(create: (_) => ActivityController()),
       ],
       child: const MyApp(),
     ),
