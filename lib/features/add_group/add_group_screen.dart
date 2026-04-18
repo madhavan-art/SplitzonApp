@@ -9,14 +9,20 @@
 //
 // ════════════════════════════════════════════════════════════════
 
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/core/utils/background_main_theme.dart';
 import 'package:splitzon/providers/group_provider.dart';
 import 'package:splitzon/features/commentActivity/activity_controller.dart';
+import 'package:splitzon/api/api_controller.dart';
+import 'package:splitzon/services/storage_service.dart';
+import 'package:splitzon/provider/user_providers.dart';
+import '../Add_members/add_members_controller.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CURRENCY DATA
@@ -71,8 +77,12 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
   final _shareCtrl = TextEditingController();
   final _budgetCtrl = TextEditingController();
 
-  final List<String> _members = [];
-  final _memberNameCtrl = TextEditingController();
+  final List<SearchedUser> _selectedMembers = [];
+  SearchedUser? _searchedUser;
+  bool _isSearching = false;
+  bool _isUserSelected = false;
+  String _searchQuery = '';
+  final _memberSearchCtrl = TextEditingController();
   bool _isSaving = false;
   String _selectedType = 'Other';
   File? _pickedImage;
@@ -93,7 +103,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
     _subtitleCtrl.dispose();
     _shareCtrl.dispose();
     _budgetCtrl.dispose();
-    _memberNameCtrl.dispose();
+    _memberSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -128,9 +138,16 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_members.isEmpty) {
-      _snack('Please add at least one member.', Colors.red);
-      return;
+
+    final userProvider = Provider.of<UserProviders>(context, listen: false);
+    final currentUserId = userProvider.user?.id;
+
+    // Collect all member ids including current user
+    final List<String> memberIds = _selectedMembers.map((u) => u.id).toList();
+
+    // Always add current user as member automatically
+    if (currentUserId != null && !memberIds.contains(currentUserId)) {
+      memberIds.add(currentUserId);
     }
 
     setState(() => _isSaving = true);
@@ -143,7 +160,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
         currency: _currency.code,
         overallBudget: double.tryParse(_budgetCtrl.text.trim()) ?? 0.0,
         myShare: double.tryParse(_shareCtrl.text.trim()) ?? 0.0,
-        members: _members,
+        members: memberIds,
         bannerImagePath: _pickedImage?.path,
       );
 
@@ -184,23 +201,78 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
     );
   }
 
-  void _addMember() {
-    final name = _memberNameCtrl.text.trim();
-    if (name.isEmpty) return;
-    if (_members.contains(name)) {
-      _snack('Member already added.', Colors.orange);
+  Future<void> _searchUsers(String query) async {
+    _searchQuery = query.trim();
+
+    if (_searchQuery.length < 3) {
+      setState(() {
+        _searchedUser = null;
+        _isUserSelected = false;
+      });
       return;
     }
+
+    setState(() => _isSearching = true);
+
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) return;
+
+      final base = ApiService.baseUrl.replaceAll('/auth', '');
+      final url = Uri.parse("$base/friends/search-users?query=$_searchQuery");
+
+      final response = await http.get(
+        url,
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final users = (data['users'] ?? data['data'] ?? []) as List;
+
+        if (users.isNotEmpty) {
+          _searchedUser = SearchedUser.fromJson(users.first);
+          _isUserSelected = _selectedMembers.any(
+            (u) => u.id == _searchedUser!.id,
+          );
+        } else {
+          _searchedUser = null;
+        }
+      } else {
+        _searchedUser = null;
+      }
+    } catch (e) {
+      _searchedUser = null;
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  void _toggleUserSelection() {
+    if (_searchedUser == null) return;
+
     setState(() {
-      _members.add(name);
-      _memberNameCtrl.clear();
+      _isUserSelected = !_isUserSelected;
+
+      if (_isUserSelected) {
+        if (!_selectedMembers.any((u) => u.id == _searchedUser!.id)) {
+          _selectedMembers.add(_searchedUser!);
+        }
+      } else {
+        _selectedMembers.removeWhere((u) => u.id == _searchedUser!.id);
+      }
     });
   }
 
-  void _removeMember(String member) {
-    setState(() {
-      _members.remove(member);
-    });
+  void _removeMember(int index) {
+    final removed = _selectedMembers.removeAt(index);
+    if (_searchedUser?.id == removed.id) {
+      _isUserSelected = false;
+    }
+    setState(() {});
   }
 
   @override
@@ -234,7 +306,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${_members.length} members',
+              '${_selectedMembers.length + 1} members',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.primary,
@@ -589,7 +661,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                 // ╚══════════════════════════════╝
                 _SectionCard(
                   title: 'Add Members',
-                  trailing: _members.isNotEmpty
+                  trailing: _selectedMembers.isNotEmpty
                       ? Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -600,7 +672,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_members.length} added',
+                            '${_selectedMembers.length} added',
                             style: TextStyle(
                               fontSize: 11,
                               color: AppColors.primary,
@@ -611,101 +683,33 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
                       : null,
                   child: Column(
                     children: [
-                      // Input row for adding members
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _memberNameCtrl,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textPrimary,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Enter member name',
-                                hintStyle: TextStyle(
-                                  color: Colors.grey.shade400,
-                                  fontSize: 13,
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFFF5F9FF),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide.none,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.shade200,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(
-                                    color: AppColors.primary,
-                                    width: 1.5,
-                                  ),
-                                ),
-                              ),
-                              onFieldSubmitted: (_) => _addMember(),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _addMember,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            child: const Icon(Icons.add, size: 20),
-                          ),
-                        ],
-                      ),
-
-                      // Selected members chips
-                      if (_members.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _members.map((member) {
-                            return Chip(
-                              avatar: CircleAvatar(
-                                backgroundColor: AppColors.primary.withOpacity(
-                                  .2,
-                                ),
-                                child: Text(
-                                  member[0].toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              label: Text(
-                                member,
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              deleteIcon: const Icon(Icons.close, size: 16),
-                              onDeleted: () => _removeMember(member),
-                              backgroundColor: Colors.white,
-                              deleteIconColor: Colors.red.shade400,
-                            );
-                          }).toList(),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 16,
+                              color: AppColors.primary.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "👥 Add members after creating the group\n\nGo to Group Dashboard → Click 'Add Members' in navigation bar\nThen you can search and add real users to this group.",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),

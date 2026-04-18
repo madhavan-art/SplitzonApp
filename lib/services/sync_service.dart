@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 import '../data/models/group_model.dart';
 import '../data/local/database_helper.dart';
 import '../data/repositories/group_repository.dart';
+import '../data/repositories/expense_repository.dart';
 
 class SyncService {
   static String baseUrl =
@@ -17,6 +18,7 @@ class SyncService {
   }
 
   final GroupRepository _groupRepository;
+  final ExpenseRepository _expenseRepository;
   final DatabaseHelper _dbHelper;
   final String? userId;
 
@@ -25,11 +27,13 @@ class SyncService {
 
   SyncService({
     GroupRepository? groupRepository,
+    ExpenseRepository? expenseRepository,
     DatabaseHelper? dbHelper,
     this.onMessage,
     this.onError,
     this.userId,
   }) : _groupRepository = groupRepository ?? GroupRepository(),
+       _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   void _log(String message) {
@@ -93,8 +97,10 @@ class SyncService {
             final success = await deleteGroupFromBackend(groupId, authToken);
 
             if (success) {
+              // ✅ FIRST DELETE ALL EXPENSES FOR THIS GROUP
+              await _expenseRepository.deleteExpensesByGroup(groupId);
               await _groupRepository.deleteGroup(groupId);
-              _log('✅ DELETED PERMANENTLY FROM BOTH MONGO AND SQLITE ✅');
+              _log('✅ DELETED GROUP + ALL EXPENSES FROM MONGO AND SQLITE ✅');
             } else {
               _log('⚠️ Delete failed for $groupName, will retry on next sync');
             }

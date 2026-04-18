@@ -30,6 +30,10 @@ class ExpenseRepository {
     return await _db.deleteExpense(id);
   }
 
+  Future<void> deleteExpensesByGroup(String groupId) async {
+    return await _db.deleteExpensesByGroup(groupId);
+  }
+
   Future<void> insertOrUpdate(Expense expense) async {
     return await _db.insertOrUpdateExpense(expense);
   }

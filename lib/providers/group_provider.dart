@@ -12,12 +12,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../data/repositories/group_repository.dart';
+import '../data/repositories/expense_repository.dart';
 import '../data/models/group_model.dart';
 import '../services/sync_service.dart';
 import '../features/commentActivity/activity_controller.dart';
 
 class GroupProvider with ChangeNotifier {
   final GroupRepository _groupRepository;
+  final ExpenseRepository _expenseRepository;
 
   List<Group> _groups = [];
   bool _isLoading = false;
@@ -26,8 +28,11 @@ class GroupProvider with ChangeNotifier {
   String _lastError = '';
   SyncService? _syncService;
 
-  GroupProvider({GroupRepository? groupRepository})
-    : _groupRepository = groupRepository ?? GroupRepository();
+  GroupProvider({
+    GroupRepository? groupRepository,
+    ExpenseRepository? expenseRepository,
+  }) : _groupRepository = groupRepository ?? GroupRepository(),
+       _expenseRepository = expenseRepository ?? ExpenseRepository();
 
   // ─────────────────────────────────────────────────────────
   void _log(String m) => debugPrint('📦 GroupProvider: $m');
@@ -291,8 +296,10 @@ class GroupProvider with ChangeNotifier {
               _authToken!,
             );
             if (success) {
+              // Delete all expenses for this group first
+              await _expenseRepository.deleteExpensesByGroup(id);
               await _groupRepository.deleteGroup(id);
-              _log('✅ DELETED PERMANENTLY FROM BOTH BACKEND AND LOCAL ✅');
+              _log('✅ DELETED GROUP + ALL RELATED EXPENSES ✅');
             } else {
               _log('⚠️ Backend delete failed, kept as PENDING_DELETE');
             }
