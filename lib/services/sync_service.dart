@@ -67,6 +67,44 @@ class SyncService {
 
       _log('Checking for pending groups...');
       final groups = await _groupRepository.fetchGroups(userId!);
+
+      // Step 1: First process pending deletes
+      // We need to access internal database for this special query
+      final db = await _dbHelper.database;
+      final allGroupsInDB = await db.query(
+        'groups',
+        where: 'userId = ?',
+        whereArgs: [userId!],
+      );
+      final pendingDeletes = allGroupsInDB
+          .where((g) => g['syncStatus'] == 'PENDING_DELETE')
+          .toList();
+
+      if (pendingDeletes.isNotEmpty) {
+        _log(
+          '✅✅✅ FOUND ${pendingDeletes.length} PENDING DELETES IN DATABASE! ✅✅✅',
+        );
+        for (final groupMap in pendingDeletes) {
+          try {
+            final groupId = groupMap['id'] as String;
+            final groupName = groupMap['name'] as String;
+
+            _log('🔄 Deleting from Mongo: $groupName | $groupId');
+            final success = await deleteGroupFromBackend(groupId, authToken);
+
+            if (success) {
+              await _groupRepository.deleteGroup(groupId);
+              _log('✅ DELETED PERMANENTLY FROM BOTH MONGO AND SQLITE ✅');
+            } else {
+              _log('⚠️ Delete failed for $groupName, will retry on next sync');
+            }
+          } catch (e) {
+            _logError('❌ Delete failed for group: $e');
+          }
+        }
+      }
+
+      // Step 2: Then process pending creates/updates
       final pending = groups.where((g) => g.syncStatus == 'PENDING').toList();
 
       if (pending.isEmpty) {

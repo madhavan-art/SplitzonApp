@@ -9,6 +9,7 @@
 //
 // ════════════════════════════════════════════════════════════════
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../data/repositories/group_repository.dart';
 import '../data/models/group_model.dart';
@@ -259,17 +260,50 @@ class GroupProvider with ChangeNotifier {
     _log('🗑️ deleteGroup($id)');
     try {
       final group = _groups.firstWhere((g) => g.id == id);
-      await _groupRepository.deleteGroup(id);
+
+      if (group.syncStatus == 'SYNCED') {
+        // ✅ Already synced to server: mark as PENDING_DELETE
+        final updatedGroup = group.copyWith(syncStatus: 'PENDING_DELETE');
+        await _groupRepository.updateGroup(updatedGroup);
+        _log('📱 Marked as PENDING_DELETE for background sync ✅');
+      } else {
+        // ✅ Never synced: delete locally immediately
+        await _groupRepository.deleteGroup(id);
+        _log('📱 Deleted pending group locally immediately ✅');
+      }
+
+      // Remove from UI immediately
       _groups.removeWhere((g) => g.id == id);
       notifyListeners();
-      _log('📱 Deleted from SQLite + UI ✅');
 
-      if (group.syncStatus == 'SYNCED' &&
-          _authToken != null &&
-          _syncService != null) {
-        await _syncService!.deleteGroupFromBackend(id, _authToken!);
-        _log('✅ Deleted from backend');
+      // Always try to delete immediately first if online
+      if (_authToken != null && _syncService != null) {
+        try {
+          final online = await InternetAddress.lookup('google.com')
+              .timeout(const Duration(seconds: 2))
+              .then((r) => r.isNotEmpty)
+              .catchError((_) => false);
+
+          if (online) {
+            _log('🌐 Online! Deleting from backend immediately...');
+            final success = await _syncService!.deleteGroupFromBackend(
+              id,
+              _authToken!,
+            );
+            if (success) {
+              await _groupRepository.deleteGroup(id);
+              _log('✅ DELETED PERMANENTLY FROM BOTH BACKEND AND LOCAL ✅');
+            } else {
+              _log('⚠️ Backend delete failed, kept as PENDING_DELETE');
+            }
+          } else {
+            _log('📴 Offline! Kept as PENDING_DELETE, will sync when online ✅');
+          }
+        } catch (e) {
+          _err('⚠️ Delete failed, kept as PENDING_DELETE: $e');
+        }
       }
+
       return true;
     } catch (e) {
       _err('deleteGroup error: $e');

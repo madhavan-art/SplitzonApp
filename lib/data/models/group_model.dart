@@ -87,14 +87,14 @@
 //       description: map['description'] ?? '',
 //       groupType: map['groupType'] ?? 'Other',
 //       currency: map['currency'] ?? 'INR',
-//       overallBudget: (map['overallBudget'] is num) 
-//           ? (map['overallBudget'] as num).toDouble() 
+//       overallBudget: (map['overallBudget'] is num)
+//           ? (map['overallBudget'] as num).toDouble()
 //           : double.tryParse(map['overallBudget']?.toString() ?? '0') ?? 0.0,
-//       myShare: (map['myShare'] is num) 
-//           ? (map['myShare'] as num).toDouble() 
+//       myShare: (map['myShare'] is num)
+//           ? (map['myShare'] as num).toDouble()
 //           : double.tryParse(map['myShare']?.toString() ?? '0') ?? 0.0,
-//       members: map['members'] != null 
-//           ? List<String>.from(jsonDecode(map['members'])) 
+//       members: map['members'] != null
+//           ? List<String>.from(jsonDecode(map['members']))
 //           : <String>[],
 //       createdBy: map['createdBy'] ?? '',
 //       bannerImagePath: map['bannerImagePath'] ?? '',
@@ -165,13 +165,12 @@
 //   factory Group.fromJson(String source) => Group.fromMap(jsonDecode(source));
 // }
 
-
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 class Group {
   final String id;
-  final String userId;      // ← NEW: which user owns this group
+  final String userId; // ← NEW: which user owns this group
   final String name;
   final String? description;
   final String groupType;
@@ -182,12 +181,13 @@ class Group {
   final String? createdBy;
   final String? bannerImagePath;
   final String? bannerImageUrl;
+  final String? bannerPublicId;
   final DateTime createdAt;
   final String syncStatus;
 
   const Group({
     required this.id,
-    required this.userId,     // ← NEW
+    required this.userId, // ← NEW
     required this.name,
     this.description,
     required this.groupType,
@@ -198,13 +198,14 @@ class Group {
     this.createdBy,
     this.bannerImagePath,
     this.bannerImageUrl,
+    this.bannerPublicId,
     required this.createdAt,
     required this.syncStatus,
   });
 
   // Factory: create a brand new group
   factory Group.create({
-    required String userId,   // ← NEW
+    required String userId, // ← NEW
     required String name,
     String? description,
     required String groupType,
@@ -217,7 +218,7 @@ class Group {
   }) {
     return Group(
       id: const Uuid().v4(),
-      userId: userId,           // ← NEW
+      userId: userId, // ← NEW
       name: name,
       description: description,
       groupType: groupType,
@@ -236,19 +237,18 @@ class Group {
   factory Group.fromMap(Map<String, dynamic> map) {
     return Group(
       id: map['id'] as String,
-      userId: map['userId'] as String? ?? '',   // ← NEW
+      userId: map['userId'] as String? ?? '', // ← NEW
       name: map['name'] as String,
       description: map['description'] as String?,
       groupType: map['groupType'] as String? ?? 'Other',
       currency: map['currency'] as String? ?? 'INR',
       overallBudget: map['overallBudget'] as double?,
       myShare: map['myShare'] as double?,
-      members: List<String>.from(
-        jsonDecode(map['members'] as String? ?? '[]'),
-      ),
+      members: List<String>.from(jsonDecode(map['members'] as String? ?? '[]')),
       createdBy: map['createdBy'] as String?,
       bannerImagePath: map['bannerImagePath'] as String?,
       bannerImageUrl: map['bannerImageUrl'] as String?,
+      bannerPublicId: map['bannerPublicId'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       syncStatus: map['syncStatus'] as String? ?? 'PENDING',
     );
@@ -258,7 +258,7 @@ class Group {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'userId': userId,         // ← NEW
+      'userId': userId, // ← NEW
       'name': name,
       'description': description ?? '',
       'groupType': groupType,
@@ -269,10 +269,24 @@ class Group {
       'createdBy': createdBy ?? '',
       'bannerImagePath': bannerImagePath ?? '',
       'bannerImageUrl': bannerImageUrl ?? '',
+      'bannerPublicId': bannerPublicId ?? '',
       'createdAt': createdAt.toIso8601String(),
       'syncStatus': syncStatus,
     };
   }
+
+  // Get display image path (for UI to use)
+  String? getDisplayImagePath() {
+    if (bannerImagePath != null && bannerImagePath!.isNotEmpty) {
+      return bannerImagePath;
+    }
+    if (bannerImageUrl != null && bannerImageUrl!.isNotEmpty) {
+      return bannerImageUrl;
+    }
+    return null;
+  }
+
+  bool get hasBanner => getDisplayImagePath() != null;
 
   Group copyWith({
     String? id,
@@ -287,12 +301,13 @@ class Group {
     String? createdBy,
     String? bannerImagePath,
     String? bannerImageUrl,
+    String? bannerPublicId,
     DateTime? createdAt,
     String? syncStatus,
   }) {
     return Group(
       id: id ?? this.id,
-      userId: userId ?? this.userId,   // ← NEW
+      userId: userId ?? this.userId, // ← NEW
       name: name ?? this.name,
       description: description ?? this.description,
       groupType: groupType ?? this.groupType,
@@ -303,6 +318,7 @@ class Group {
       createdBy: createdBy ?? this.createdBy,
       bannerImagePath: bannerImagePath ?? this.bannerImagePath,
       bannerImageUrl: bannerImageUrl ?? this.bannerImageUrl,
+      bannerPublicId: bannerPublicId ?? this.bannerPublicId,
       createdAt: createdAt ?? this.createdAt,
       syncStatus: syncStatus ?? this.syncStatus,
     );

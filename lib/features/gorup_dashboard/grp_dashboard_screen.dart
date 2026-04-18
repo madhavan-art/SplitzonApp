@@ -14,6 +14,7 @@ import 'package:splitzon/features/gorup_dashboard/grp_dashboard_controller.dart'
 import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/providers/expense_provider.dart';
 import 'package:splitzon/features/commentActivity/activity_screen.dart';
+import 'package:splitzon/features/gorup_dashboard/group_settings_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final Group group;
@@ -215,7 +216,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                     color: AppColors.primary,
                     size: 20,
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            GroupSettingsScreen(group: widget.group),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -359,23 +368,41 @@ class _HeroBannerCard extends StatelessWidget {
   }
 
   Widget _background() {
-    if (group.bannerImagePath != null && group.bannerImagePath!.isNotEmpty) {
-      return Opacity(
-        opacity: 0.15,
-        child: Image.file(File(group.bannerImagePath!), fit: BoxFit.cover),
-      );
-    }
-    if (group.bannerImageUrl != null && group.bannerImageUrl!.isNotEmpty) {
-      return Opacity(
-        opacity: 0.15,
-        child: Image.network(
-          group.bannerImageUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    // ALWAYS SHOW GROUP LETTER FIRST
+    final letterWidget = Center(
+      child: Text(
+        group.name.isNotEmpty ? group.name[0].toUpperCase() : '?',
+        style: TextStyle(
+          fontSize: 110,
+          fontWeight: FontWeight.w900,
+          color: Colors.white.withOpacity(0.15),
         ),
+      ),
+    );
+
+    if (group.hasBanner) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Opacity(
+            opacity: 0.25,
+            child:
+                group.bannerImagePath != null &&
+                    group.bannerImagePath!.isNotEmpty
+                ? Image.file(File(group.bannerImagePath!), fit: BoxFit.cover)
+                : Image.network(
+                    group.bannerImageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+          ),
+          letterWidget,
+        ],
       );
     }
-    return const SizedBox.shrink();
+
+    // No banner: show only letter
+    return letterWidget;
   }
 }
 

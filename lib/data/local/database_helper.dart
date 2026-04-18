@@ -26,7 +26,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 7, // ← bumped again to 7 to force upgrade
+      version: 8, // ← bumped to 8 for bannerPublicId column
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -48,6 +48,7 @@ class DatabaseHelper {
         createdBy TEXT DEFAULT "",
         bannerImagePath TEXT DEFAULT "",
         bannerImageUrl TEXT DEFAULT "",
+        bannerPublicId TEXT DEFAULT "",
         createdAt TEXT NOT NULL,
         syncStatus TEXT NOT NULL
       )
@@ -205,6 +206,12 @@ class DatabaseHelper {
       ''');
       // Removed debug print
     }
+
+    if (oldVersion < 8) {
+      await db.execute(
+        'ALTER TABLE groups ADD COLUMN bannerPublicId TEXT DEFAULT ""',
+      );
+    }
   }
 
   // ════════════════════════════════════════════════════════════
@@ -234,11 +241,11 @@ class DatabaseHelper {
     final db = await database;
     final maps = await db.query(
       'groups',
-      where: 'userId = ?',
-      whereArgs: [userId],
+      where: 'userId = ? AND syncStatus != ?',
+      whereArgs: [userId, 'PENDING_DELETE'],
       orderBy: 'createdAt DESC',
     );
-    return maps.map((m) => Group.fromMap(m)).toList();
+    return maps.map((map) => Group.fromMap(map)).toList();
   }
 
   Future<int> updateGroup(Group group) async {

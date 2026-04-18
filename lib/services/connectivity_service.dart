@@ -58,12 +58,12 @@ class ConnectivityService {
     final provider = _groupProvider;
     if (provider == null) return;
 
-    // Sync pending groups
-    final pending = provider.getPendingGroups();
-    if (pending.isNotEmpty) {
-      debugPrint('📡 Syncing ${pending.length} pending group(s)...');
-      await provider.syncWithBackend();
-    }
+    // ✅ ALWAYS sync when coming online! Don't check pending count
+    // Because PENDING_DELETE groups are not in getPendingGroups()
+    debugPrint(
+      '📡 Going online! Triggering full sync for ALL pending operations...',
+    );
+    await provider.syncWithBackend();
 
     // Sync pending profile changes
     debugPrint('📡 Syncing pending profile changes...');
