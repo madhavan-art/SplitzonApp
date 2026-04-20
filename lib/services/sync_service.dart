@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import '../api/api_controller.dart';
 import '../data/models/group_model.dart';
 import '../data/local/database_helper.dart';
 import '../data/repositories/group_repository.dart';
@@ -97,7 +98,26 @@ class SyncService {
             final success = await deleteGroupFromBackend(groupId, authToken);
 
             if (success) {
-              // ✅ FIRST DELETE ALL EXPENSES FOR THIS GROUP
+              // ✅ FIRST CALL BACKEND DELETE ALL GROUP EXPENSES ENDPOINT
+              try {
+                final expenseDeleteUrl = Uri.parse(
+                  '${ApiService.baseUrl.replaceAll('/auth', '')}/expenses/group/$groupId',
+                );
+                await http.delete(
+                  expenseDeleteUrl,
+                  headers: {
+                    "Authorization": "Bearer $authToken",
+                    "Content-Type": "application/json",
+                  },
+                );
+                _log(
+                  '✅ BACKEND: All group expenses deleted and balances reset ✅',
+                );
+              } catch (e) {
+                _log('⚠️ Backend expense delete failed: $e');
+              }
+
+              // THEN DELETE LOCAL DATA
               await _expenseRepository.deleteExpensesByGroup(groupId);
               await _groupRepository.deleteGroup(groupId);
               _log('✅ DELETED GROUP + ALL EXPENSES FROM MONGO AND SQLITE ✅');
