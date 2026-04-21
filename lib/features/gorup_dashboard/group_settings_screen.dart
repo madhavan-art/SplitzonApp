@@ -199,10 +199,10 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             const SizedBox(height: 12),
 
             // Members list
-            ...widget.group.members.map((memberId) {
+            ...widget.group.members.map((member) {
               return _MemberCard(
-                memberId: memberId,
-                isCreator: memberId == widget.group.createdBy,
+                member: member,
+                isCreator: member.id == widget.group.createdBy,
               );
             }),
 
@@ -452,10 +452,10 @@ class _InfoRow extends StatelessWidget {
 
 // ── MEMBER CARD ─────────────────────────────────────────────────
 class _MemberCard extends StatelessWidget {
-  final String memberId;
+  final dynamic member;
   final bool isCreator;
 
-  const _MemberCard({required this.memberId, this.isCreator = false});
+  const _MemberCard({required this.member, this.isCreator = false});
 
   static const _colors = [
     Color(0xFF1565C0),
@@ -467,7 +467,7 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorIndex = memberId.hashCode % _colors.length;
+    final colorIndex = member.id.hashCode % _colors.length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -489,7 +489,9 @@ class _MemberCard extends StatelessWidget {
             radius: 20,
             backgroundColor: _colors[colorIndex].withOpacity(0.85),
             child: Text(
-              memberId.isNotEmpty ? memberId[0].toUpperCase() : '?',
+              member.name?.isNotEmpty == true
+                  ? member.name![0].toUpperCase()
+                  : '?',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -502,7 +504,7 @@ class _MemberCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  memberId,
+                  member.name ?? member.id,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,

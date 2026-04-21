@@ -426,6 +426,18 @@ class _MemberAvatarOverflow extends StatelessWidget {
   Widget build(BuildContext context) {
     final show = group.members.length > 4 ? 4 : group.members.length;
     final total = group.members.length;
+
+    // ✅ DEBUG LOGS: Print member data to console
+    print('══════════════════════════════════════════');
+    print('✅ GROUP MEMBER DATA DEBUG:');
+    print('Group: ${group.name} | Members count: ${group.members.length}');
+    for (int m = 0; m < group.members.length; m++) {
+      print(
+        '  Member [$m]: ${group.members[m].name} | length: ${group.members[m].name.length} | first char: ${group.members[m].name.isNotEmpty ? group.members[m].name[0] : "empty"}',
+      );
+    }
+    print('══════════════════════════════════════════');
+
     return Row(
       children: List.generate(show, (i) {
         return Transform.translate(
@@ -441,6 +453,10 @@ class _MemberAvatarOverflow extends StatelessWidget {
             child: CircleAvatar(
               radius: avatarRadius,
               backgroundColor: _colors[i % _colors.length].withOpacity(0.85),
+              // ✅ Proper Avatar Logic:
+              // 1. Check if user has profile photo - show image
+              // 2. Otherwise show first letter of name always
+              backgroundImage: null, // add your profile image check here
               child: (total > 4 && i == 3)
                   ? Text(
                       '+${total - 3}',
@@ -451,8 +467,8 @@ class _MemberAvatarOverflow extends StatelessWidget {
                       ),
                     )
                   : Text(
-                      group.members[i].isNotEmpty
-                          ? group.members[i][0].toUpperCase()
+                      group.members[i].name.isNotEmpty
+                          ? group.members[i].name[0].toUpperCase()
                           : '?',
                       style: TextStyle(
                         color: Colors.white,

@@ -14,12 +14,15 @@ import 'package:flutter/material.dart';
 import '../data/repositories/group_repository.dart';
 import '../data/repositories/expense_repository.dart';
 import '../data/models/group_model.dart';
+import '../data/models/member_model.dart';
 import '../services/sync_service.dart';
 import '../features/commentActivity/activity_controller.dart';
+import '../provider/user_providers.dart';
 
 class GroupProvider with ChangeNotifier {
   final GroupRepository _groupRepository;
   final ExpenseRepository _expenseRepository;
+  final UserProviders _userProviders;
 
   List<Group> _groups = [];
   bool _isLoading = false;
@@ -31,8 +34,10 @@ class GroupProvider with ChangeNotifier {
   GroupProvider({
     GroupRepository? groupRepository,
     ExpenseRepository? expenseRepository,
+    required UserProviders userProviders,
   }) : _groupRepository = groupRepository ?? GroupRepository(),
-       _expenseRepository = expenseRepository ?? ExpenseRepository();
+       _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _userProviders = userProviders;
 
   // ─────────────────────────────────────────────────────────
   void _log(String m) => debugPrint('📦 GroupProvider: $m');
@@ -217,6 +222,30 @@ class GroupProvider with ChangeNotifier {
     _log('createGroup(): "$name"');
 
     try {
+      // ✅ AUTO POPULATE CURRENT USER DETAILS WHEN CREATING GROUP
+      List<Member> memberList = [];
+
+      for (final memberId in members) {
+        if (memberId == _userId && _userProviders.user != null) {
+          // ✅ THIS IS CURRENT USER - FILL ALL DETAILS AUTOMATICALLY
+          memberList.add(
+            Member(
+              id: memberId,
+              name: _userProviders.user!.name,
+              email: _userProviders.user!.email,
+              phone: _userProviders.user!.phone,
+              photoUrl: _userProviders.user!.profile ?? '',
+            ),
+          );
+          _log(
+            '✅ Added CURRENT USER as member with full details: ${_userProviders.user!.name}',
+          );
+        } else {
+          // Other members will be populated during sync
+          memberList.add(Member(id: memberId, name: ''));
+        }
+      }
+
       final group = Group.create(
         userId: _userId!,
         name: name,
@@ -225,7 +254,7 @@ class GroupProvider with ChangeNotifier {
         currency: currency,
         overallBudget: overallBudget,
         myShare: myShare,
-        members: members,
+        members: memberList,
         createdBy: createdBy ?? _userId,
         bannerImagePath: bannerImagePath,
       );
@@ -233,6 +262,42 @@ class GroupProvider with ChangeNotifier {
       await _groupRepository.addGroup(group);
       _groups.insert(0, group);
       notifyListeners();
+
+      // ✅ FULL DEBUG LOG OF EVERYTHING THAT IS BEING STORED
+      debugPrint('');
+      debugPrint(
+        '═══════════════════════════════════════════════════════════════',
+      );
+      debugPrint('  🟢 GROUP CREATED AND SAVED TO DATABASE - FULL DATA:');
+      debugPrint(
+        '═══════════════════════════════════════════════════════════════',
+      );
+      debugPrint('  Group ID:        ${group.id}');
+      debugPrint('  User ID:         ${group.userId}');
+      debugPrint('  Name:            ${group.name}');
+      debugPrint('  Description:     ${group.description ?? '(empty)'}');
+      debugPrint('  Type:            ${group.groupType}');
+      debugPrint('  Currency:        ${group.currency}');
+      debugPrint('  Budget:          ${group.overallBudget}');
+      debugPrint('  My Share:        ${group.myShare}');
+      debugPrint('  Created By:      ${group.createdBy}');
+      debugPrint('  Sync Status:     ${group.syncStatus}');
+      debugPrint('  Created At:      ${group.createdAt}');
+      debugPrint('  Banner Path:     ${group.bannerImagePath ?? '(none)'}');
+      debugPrint('  Banner URL:      ${group.bannerImageUrl ?? '(none)'}');
+      debugPrint('');
+      debugPrint('  ➤ MEMBERS BEING SAVED (${group.members.length} total):');
+      for (var i = 0; i < group.members.length; i++) {
+        final member = group.members[i];
+        debugPrint(
+          '    [$i] ID: ${member.id} | Name: "${member.name}" | Email: "${member.email}" | Phone: "${member.phone}" | Photo: "${member.photoUrl}"',
+        );
+      }
+      debugPrint(
+        '═══════════════════════════════════════════════════════════════',
+      );
+      debugPrint('');
+
       _log('📱 Saved PENDING to SQLite → UI updated ✅');
 
       if (_authToken != null && _syncService != null) {

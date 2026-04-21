@@ -40,7 +40,7 @@
 //     String currency = 'INR',
 //     double? overallBudget,
 //     double? myShare,
-//     required List<String> members,
+//     required List<Member> members,
 //     String? createdBy,
 //     String? bannerImagePath,
 //   }) {
@@ -167,6 +167,7 @@
 
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import 'member_model.dart';
 
 class Group {
   final String id;
@@ -177,7 +178,7 @@ class Group {
   final String currency;
   final double? overallBudget;
   final double? myShare;
-  final List<String> members;
+  final List<Member> members;
   final String? createdBy;
   final String? bannerImagePath;
   final String? bannerImageUrl;
@@ -212,7 +213,7 @@ class Group {
     String currency = 'INR',
     double? overallBudget,
     double? myShare,
-    required List<String> members,
+    required List<Member> members,
     String? createdBy,
     String? bannerImagePath,
   }) {
@@ -244,7 +245,9 @@ class Group {
       currency: map['currency'] as String? ?? 'INR',
       overallBudget: map['overallBudget'] as double?,
       myShare: map['myShare'] as double?,
-      members: List<String>.from(jsonDecode(map['members'] as String? ?? '[]')),
+      members: map['members'] != null
+          ? Member.fromJsonList(jsonDecode(map['members'] as String))
+          : <Member>[],
       createdBy: map['createdBy'] as String?,
       bannerImagePath: map['bannerImagePath'] as String?,
       bannerImageUrl: map['bannerImageUrl'] as String?,
@@ -265,7 +268,7 @@ class Group {
       'currency': currency,
       'overallBudget': overallBudget ?? 0.0,
       'myShare': myShare ?? 0.0,
-      'members': jsonEncode(members),
+      'members': jsonEncode(Member.toMapList(members)),
       'createdBy': createdBy ?? '',
       'bannerImagePath': bannerImagePath ?? '',
       'bannerImageUrl': bannerImageUrl ?? '',
@@ -297,7 +300,7 @@ class Group {
     String? currency,
     double? overallBudget,
     double? myShare,
-    List<String>? members,
+    List<Member>? members,
     String? createdBy,
     String? bannerImagePath,
     String? bannerImageUrl,

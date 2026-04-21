@@ -1191,7 +1191,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 15),
 
-                  QuickActions(onNewGroup: _openAddGroup),
+                  QuickActions(
+                    onNewGroup: _openAddGroup,
+                    onAnalytics: () {
+                      // Navigate to Analytics tab (index 2)
+                      setState(() {
+                        _selectedNavIndex = 2;
+                      });
+                    },
+                    onActivity: () {
+                      // Navigate to Activity tab (index 1)
+                      setState(() {
+                        _selectedNavIndex = 1;
+                      });
+                    },
+                  ),
                   const SizedBox(height: 25),
 
                   /// GROUPS HEADER
@@ -1428,14 +1442,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final userProvider = context.read<UserProviders>();
 
     final currentUserId = userProvider.user?.id ?? "";
-    print("===== GROUP =====");
-    print(group.name);
-    print("Members:");
-    print(group.members);
     String currencySymbol = _getCurrencySymbol(group.currency);
 
     return GestureDetector(
       onTap: () {
+        // ✅ FULL GROUP DEBUG LOG WHEN CLICKING GROUP CARD
+        debugPrint('');
+        debugPrint('═══════════════════════════════════════════════════');
+        debugPrint('  🟢 GROUP CARD CLICKED: ${group.name}');
+        debugPrint('═══════════════════════════════════════════════════');
+        debugPrint('  Group ID:    ${group.id}');
+        debugPrint('  Name:        ${group.name}');
+        debugPrint('  Type:        ${group.groupType}');
+        debugPrint('  Created By:  ${group.createdBy ?? 'N/A'}');
+        debugPrint('  Budget:      ${group.overallBudget}');
+        debugPrint('  Currency:    ${group.currency}');
+        debugPrint('  Sync Status: ${group.syncStatus}');
+        debugPrint('  Created At:  ${group.createdAt}');
+        debugPrint('');
+        debugPrint('  ➤ MEMBERS LIST (${group.members.length} total):');
+        for (var i = 0; i < group.members.length; i++) {
+          final member = group.members[i];
+          final isCurrentUser = member == currentUserId ? ' ✅ (YOU)' : '';
+          debugPrint('    [$i] ${member.toString()}$isCurrentUser');
+        }
+        debugPrint('═══════════════════════════════════════════════════');
+        debugPrint('');
+
         // ✅ Navigate to GroupDetailScreen passing the group
         Navigator.push(
           context,
@@ -1776,16 +1809,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   //   return value[0].toUpperCase();
   // }
 
-  String getAvatarText(String member, String currentUserId) {
-    // If this member is current user
-    if (member == currentUserId) {
-      return "Me";
+  String getAvatarText(dynamic member, String currentUserId) {
+    if (member.name?.isNotEmpty == true) {
+      return member.name![0].toUpperCase();
     }
 
-    if (member.isEmpty) return "?";
+    if (member.id?.isNotEmpty == true) {
+      return member.id[0].toUpperCase();
+    }
 
-    // Show first letter for others
-    return member[0].toUpperCase();
+    return "?";
   }
 }
 
@@ -1810,8 +1843,15 @@ class _NavItem {
 
 class QuickActions extends StatelessWidget {
   final VoidCallback onNewGroup;
+  final VoidCallback onAnalytics;
+  final VoidCallback onActivity;
 
-  const QuickActions({super.key, required this.onNewGroup});
+  const QuickActions({
+    super.key,
+    required this.onNewGroup,
+    required this.onAnalytics,
+    required this.onActivity,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1824,15 +1864,17 @@ class QuickActions extends StatelessWidget {
           color: Colors.green,
           onTap: onNewGroup, // ✅ connected
         ),
-        const ActionItem(
+        ActionItem(
           icon: Icons.analytics_rounded,
           label: 'Analytics',
           color: Colors.orange,
+          onTap: onAnalytics, // ✅ connected
         ),
-        const ActionItem(
+        ActionItem(
           icon: Icons.history_rounded,
           label: 'Activity',
           color: Colors.blue,
+          onTap: onActivity, // ✅ connected
         ),
       ],
     );

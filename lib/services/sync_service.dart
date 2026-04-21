@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../api/api_controller.dart';
 import '../data/models/group_model.dart';
+import '../data/models/member_model.dart';
 import '../data/local/database_helper.dart';
 import '../data/repositories/group_repository.dart';
 import '../data/repositories/expense_repository.dart';
@@ -165,7 +166,9 @@ class SyncService {
       request.fields['currency'] = group.currency;
       request.fields['overallBudget'] = (group.overallBudget ?? 0).toString();
       request.fields['myShare'] = (group.myShare ?? 0).toString();
-      request.fields['members'] = jsonEncode(group.members);
+      request.fields['members'] = jsonEncode(
+        group.members.map((m) => m.toMap()).toList(),
+      );
 
       if (group.bannerImagePath != null && group.bannerImagePath!.isNotEmpty) {
         final file = File(group.bannerImagePath!);
@@ -261,7 +264,7 @@ class SyncService {
                 myShare: (bg['myShare'] is num)
                     ? (bg['myShare'] as num).toDouble()
                     : 0.0,
-                members: List<String>.from(bg['members'] ?? []),
+                members: Member.fromJsonList(bg['members'] ?? []),
                 createdBy: bg['createdBy'] ?? '',
                 bannerImageUrl: bg['bannerImage'] ?? '',
                 createdAt: bg['createdAt'] != null

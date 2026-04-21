@@ -6,6 +6,7 @@ import 'package:splitzon/services/storage_service.dart';
 
 import '../local/database_helper.dart';
 import '../models/group_model.dart';
+import '../models/member_model.dart';
 
 class GroupRepository {
   final DatabaseHelper _databaseHelper;
@@ -39,9 +40,9 @@ class GroupRepository {
   // ─────────────────────────────────────────────────────────────
   // FIXED: ADD MEMBER (now sends correct payload)
   // ─────────────────────────────────────────────────────────────
-  Future<void> addMember({
+  Future<void> addMembers({
     required String groupId,
-    required String memberId,
+    required List<Map<String, dynamic>> members,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -56,10 +57,8 @@ class GroupRepository {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
         },
-        // ✅ FIXED: Backend expects "memberIds" as ARRAY
-        body: jsonEncode({
-          "memberIds": [memberId],
-        }),
+        // ✅ NOW SENDING FULL MEMBER OBJECTS
+        body: jsonEncode({"members": members}),
       );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -67,15 +66,14 @@ class GroupRepository {
             ? response.body
             : 'Unknown error';
         throw Exception(
-          "Failed to add member (${response.statusCode}): $errorBody",
+          "Failed to add members (${response.statusCode}): $errorBody",
         );
       }
 
-      // Optional: log success
-      debugPrint('✅ Member $memberId added to group $groupId');
+      debugPrint('✅ ${members.length} members added to group $groupId');
     } catch (e) {
-      debugPrint("❌ Add member error: $e");
-      rethrow; // Let controller catch it
+      debugPrint("❌ Add members error: $e");
+      rethrow;
     }
   }
 
@@ -122,7 +120,7 @@ class GroupRepository {
         myShare: (groupJson["myShare"] is num)
             ? (groupJson["myShare"] as num).toDouble()
             : 0.0,
-        members: List<String>.from(groupJson["members"] ?? []),
+        members: Member.fromJsonList(groupJson["members"] ?? []),
         createdBy: groupJson["createdBy"] ?? "",
         bannerImagePath: null, // not needed here
         bannerImageUrl: groupJson["bannerImage"] ?? "",

@@ -27,7 +27,10 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => UserProviders()),
-        ChangeNotifierProvider(create: (_) => GroupProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              GroupProvider(userProviders: ctx.read<UserProviders>()),
+        ),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()), // ← NEW
         ChangeNotifierProvider(create: (_) => ProfileController()),
         ChangeNotifierProvider(create: (_) => ActivityController()),

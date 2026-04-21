@@ -57,11 +57,11 @@ class AddExpenseController extends ChangeNotifier {
   }
 
   void _loadMembers() {
-    members = group.members.map((name) {
+    members = group.members.map((member) {
       return MemberModel(
-        id: name,
-        name: name,
-        avatar: 'https://i.pravatar.cc/150?u=$name',
+        id: member.id,
+        name: member.name.isNotEmpty ? member.name : member.id,
+        avatar: 'https://i.pravatar.cc/150?u=${member.id}',
         isSelected: true,
         percentage: 0,
         shareAmount: 0,

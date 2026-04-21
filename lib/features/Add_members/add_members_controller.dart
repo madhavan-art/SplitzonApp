@@ -153,19 +153,31 @@ class AddMembersController extends ChangeNotifier {
         listen: false,
       );
 
-      for (final user in selectedUsers) {
-        await _groupRepository.addMember(groupId: groupId, memberId: user.id);
-        debugPrint('✅ Added: ${user.name}');
+      // ✅ Convert selected users to proper format for backend
+      final membersList = selectedUsers
+          .map(
+            (user) => {
+              "id": user.id,
+              "name": user.name,
+              "email": user.email,
+              "phone": user.phone,
+              "photoUrl": user.profilePicture,
+            },
+          )
+          .toList();
 
-        // ✅ Log activity for each member added
+      // ✅ Send ALL members in SINGLE API CALL
+      await _groupRepository.addMembers(groupId: groupId, members: membersList);
+      debugPrint('✅ ALL ${selectedUsers.length} members added');
+
+      // ✅ Log activity for each member added
+      for (final user in selectedUsers) {
         await activityController.logMemberAdded(
           user.name,
           groupId,
           group.name,
           currentUserName,
         );
-
-        debugPrint('📋 Activity logged for member: ${user.name}');
       }
 
       await _groupRepository.syncGroupMembers(groupId);
