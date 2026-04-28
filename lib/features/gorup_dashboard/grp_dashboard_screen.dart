@@ -30,6 +30,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   late Animation<double> _fade;
   late Animation<Offset> _slide;
   late GroupDetailController _ctrl;
+  int _currentTab = 0;
 
   @override
   void initState() {
@@ -67,95 +68,310 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     super.dispose();
   }
 
+  // @override
+  // Widget build(BuildContext context) {
+  //   final sw = MediaQuery.of(context).size.width;
+  //   final hPad = sw * 0.05;
+
+  //   // Sync expense provider data into controller
+  //   final expenseProvider = context.watch<ExpenseProvider>();
+  //   final expenses = expenseProvider.getExpenses(widget.group.id);
+  //   _ctrl.setExpenses(expenses);
+
+  //   return Scaffold(
+  //     backgroundColor: const Color(0xFFF5F8FF),
+  //     bottomNavigationBar: const GroupDetailBottomBar(),
+  //     body: FadeTransition(
+  //       opacity: _fade,
+  //       child: SlideTransition(
+  //         position: _slide,
+  //         child: RefreshIndicator(
+  //           onRefresh: () =>
+  //               context.read<ExpenseProvider>().loadExpenses(widget.group.id),
+  //           color: AppColors.primary,
+  //           child: CustomScrollView(
+  //             slivers: [
+  //               SliverToBoxAdapter(child: _buildTopBar()),
+  //               SliverToBoxAdapter(
+  //                 child: Padding(
+  //                   padding: EdgeInsets.symmetric(horizontal: hPad),
+  //                   child: _HeroBannerCard(
+  //                     group: widget.group,
+  //                     totalExpenses: _ctrl.totalExpenses,
+  //                     symbol: _ctrl.symbol,
+  //                   ),
+  //                 ),
+  //               ),
+  //               SliverToBoxAdapter(
+  //                 child: expenseProvider.isLoading(widget.group.id)
+  //                     ? const SizedBox(
+  //                         height: 200,
+  //                         child: Center(
+  //                           child: CircularProgressIndicator(
+  //                             color: AppColors.primary,
+  //                           ),
+  //                         ),
+  //                       )
+  //                     : Padding(
+  //                         padding: EdgeInsets.symmetric(horizontal: hPad),
+  //                         child: Column(
+  //                           crossAxisAlignment: CrossAxisAlignment.start,
+  //                           children: [
+  //                             const SizedBox(height: 20),
+  //                             _CombinedStatusCard(ctrl: _ctrl),
+  //                             const SizedBox(height: 24),
+  //                             _ExpensesHeader(onViewAll: () {}),
+  //                             const SizedBox(height: 14),
+  //                             if (expenses.isEmpty)
+  //                               _EmptyExpenses()
+  //                             else
+  //                               ...expenses.map(
+  //                                 (e) => _ExpenseCard(
+  //                                   expense: e,
+  //                                   symbol: _ctrl.symbol,
+  //                                 ),
+  //                               ),
+  //                             const SizedBox(height: 120),
+  //                           ],
+  //                         ),
+  //                       ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //     floatingActionButton: FloatingActionButton(
+  //       backgroundColor: AppColors.primary,
+  //       foregroundColor: Colors.white,
+  //       onPressed: () async {
+  //         await Navigator.push(
+  //           context,
+  //           MaterialPageRoute(
+  //             builder: (_) => AddExpenseScreen(group: widget.group),
+  //           ),
+  //         );
+  //         // Refresh after returning from add expense screen
+  //         if (mounted) {
+  //           context.read<ExpenseProvider>().loadExpenses(widget.group.id);
+  //         }
+  //       },
+  //       child: const Icon(Icons.add_rounded),
+  //     ),
+  //   );
+  // }
   @override
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final hPad = sw * 0.05;
 
-    // Sync expense provider data into controller
     final expenseProvider = context.watch<ExpenseProvider>();
     final expenses = expenseProvider.getExpenses(widget.group.id);
     _ctrl.setExpenses(expenses);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FF),
-      bottomNavigationBar: const GroupDetailBottomBar(),
-      body: FadeTransition(
-        opacity: _fade,
-        child: SlideTransition(
-          position: _slide,
-          child: RefreshIndicator(
-            onRefresh: () =>
-                context.read<ExpenseProvider>().loadExpenses(widget.group.id),
-            color: AppColors.primary,
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildTopBar()),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: hPad),
-                    child: _HeroBannerCard(
-                      group: widget.group,
-                      totalExpenses: _ctrl.totalExpenses,
-                      symbol: _ctrl.symbol,
-                    ),
-                  ),
+      bottomNavigationBar: _buildBottomNav(),
+      body: IndexedStack(
+        index: _currentTab,
+        children: [
+          // 0 - Dashboard
+          FadeTransition(
+            opacity: _fade,
+            child: SlideTransition(
+              position: _slide,
+              child: RefreshIndicator(
+                onRefresh: () => context.read<ExpenseProvider>().loadExpenses(
+                  widget.group.id,
                 ),
-                SliverToBoxAdapter(
-                  child: expenseProvider.isLoading(widget.group.id)
-                      ? const SizedBox(
-                          height: 200,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        )
-                      : Padding(
-                          padding: EdgeInsets.symmetric(horizontal: hPad),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 20),
-                              _CombinedStatusCard(ctrl: _ctrl),
-                              const SizedBox(height: 24),
-                              _ExpensesHeader(onViewAll: () {}),
-                              const SizedBox(height: 14),
-                              if (expenses.isEmpty)
-                                _EmptyExpenses()
-                              else
-                                ...expenses.map(
-                                  (e) => _ExpenseCard(
-                                    expense: e,
-                                    symbol: _ctrl.symbol,
-                                  ),
-                                ),
-                              const SizedBox(height: 120),
-                            ],
-                          ),
+                color: AppColors.primary,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildTopBar()),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: hPad),
+                        child: _HeroBannerCard(
+                          group: widget.group,
+                          totalExpenses: _ctrl.totalExpenses,
+                          symbol: _ctrl.symbol,
                         ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: expenseProvider.isLoading(widget.group.id)
+                          ? const SizedBox(
+                              height: 200,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : Padding(
+                              padding: EdgeInsets.symmetric(horizontal: hPad),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 20),
+                                  _CombinedStatusCard(ctrl: _ctrl),
+                                  const SizedBox(height: 24),
+                                  _ExpensesHeader(onViewAll: () {}),
+                                  const SizedBox(height: 14),
+                                  if (expenses.isEmpty)
+                                    _EmptyExpenses()
+                                  else
+                                    ...expenses.map(
+                                      (e) => _ExpenseCard(
+                                        expense: e,
+                                        symbol: _ctrl.symbol,
+                                        totalGroupMembers:
+                                            widget.group.members.length,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 120),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 1 - Add Members
+          AddMembersScreen(groupId: widget.group.id),
+
+          // 2 - Activity
+          ActivityScreen(
+            groupId: widget.group.id,
+            groupName: widget.group.name,
+          ),
+
+          // 3 - Analytics placeholder
+          const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'Analytics\nComing Soon',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddExpenseScreen(group: widget.group),
+      floatingActionButton: _currentTab == 0
+          ? FloatingActionButton(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddExpenseScreen(group: widget.group),
+                  ),
+                );
+                if (mounted) {
+                  context.read<ExpenseProvider>().loadExpenses(widget.group.id);
+                }
+              },
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildBottomNav() {
+    final items = [
+      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'Dashboard'),
+      (Icons.people_outline_rounded, Icons.people_rounded, 'Members'),
+      (
+        Icons.access_time_outlined,
+        Icons.access_time_filled_rounded,
+        'Activity',
+      ),
+      (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Analytics'),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary.withOpacity(.12), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(.10),
+            blurRadius: 16,
+            spreadRadius: 0,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(items.length, (i) {
+          final isActive = _currentTab == i;
+          final item = items[i];
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _currentTab = i),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.primary.withOpacity(.1)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isActive ? item.$2 : item.$1,
+                      color: isActive
+                          ? AppColors.primary
+                          : Colors.grey.shade400,
+                      size: 20, // ← smaller icon
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.$3,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 9.5, // ← smaller label
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                        color: isActive
+                            ? AppColors.primary
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
-          // Refresh after returning from add expense screen
-          if (mounted) {
-            context.read<ExpenseProvider>().loadExpenses(widget.group.id);
-          }
-        },
-        child: const Icon(Icons.add_rounded),
+        }),
       ),
     );
   }
@@ -314,38 +530,49 @@ class _HeroBannerCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1565C0).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(
-                                    0xFF1565C0,
-                                  ).withOpacity(0.2),
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      GroupSettingsScreen(group: group),
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.people_rounded,
-                                    size: 13,
-                                    color: Color(0xFF1565C0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF1565C0,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF1565C0,
+                                    ).withOpacity(0.2),
                                   ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    '${group.members.length} Members',
-                                    style: const TextStyle(
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.people_rounded,
+                                      size: 13,
                                       color: Color(0xFF1565C0),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '${group.members.length} Members',
+                                      style: const TextStyle(
+                                        color: Color(0xFF1565C0),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -854,19 +1081,22 @@ String _formatDate(DateTime dt) {
 class _ExpenseCard extends StatelessWidget {
   final Expense expense;
   final String symbol;
-  const _ExpenseCard({required this.expense, required this.symbol});
+  final int totalGroupMembers;
+  const _ExpenseCard({
+    required this.expense,
+    required this.symbol,
+    required this.totalGroupMembers,
+  });
 
   @override
   Widget build(BuildContext context) {
     final icon = _iconForCategory(expense.category);
     final iconColor = _iconColorForCategory(expense.category);
     final iconBg = _iconBgForCategory(expense.category);
-    // Top: how many members are involved in this split
-    // Bottom: total members in the expense's memberShares list
+    // final involved = expense.memberShares.where((s) => s.isInvolved).length;
     final involvedCount = expense.memberShares
         .where((s) => s.isInvolved)
         .length;
-    final totalMembersInExpense = expense.memberShares.length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -965,7 +1195,7 @@ class _ExpenseCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '$involvedCount/$totalMembersInExpense SPLIT',
+                  '$involvedCount/$totalGroupMembers SPLIT', // ← FIXED: Now shows correct ratio
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
@@ -986,162 +1216,6 @@ class _ExpenseCard extends StatelessWidget {
 // GROUP DETAIL BOTTOM BAR
 // Same style as Home screen
 // ─────────────────────────────────────────
-
-class GroupDetailBottomBar extends StatefulWidget {
-  const GroupDetailBottomBar({super.key});
-
-  @override
-  State<GroupDetailBottomBar> createState() => _GroupDetailBottomBarState();
-}
-
-class _GroupDetailBottomBarState extends State<GroupDetailBottomBar> {
-  int _currentIndex = 0;
-
-  final List<_NavItem> _items = const [
-    _NavItem(
-      icon: Icons.dashboard_outlined,
-      activeIcon: Icons.dashboard,
-      label: 'Dashboard',
-    ),
-    _NavItem(
-      icon: Icons.people_outline,
-      activeIcon: Icons.people_rounded,
-      label: 'Friends',
-    ),
-    _NavItem(
-      icon: Icons.access_time_outlined,
-      activeIcon: Icons.access_time,
-      label: 'Activity',
-    ),
-    _NavItem(
-      icon: Icons.bar_chart_outlined,
-      activeIcon: Icons.bar_chart,
-      label: 'Analytics',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(.2),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(.08),
-            blurRadius: 20,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(_items.length, (index) {
-          final item = _items[index];
-          final isActive = _currentIndex == index;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _currentIndex = index;
-              });
-
-              // Navigation logic
-              switch (index) {
-                case 0:
-                  Navigator.pop(context);
-                  break;
-
-                case 1:
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddMembersScreen(
-                        groupId: context
-                            .findAncestorWidgetOfExactType<GroupDetailScreen>()!
-                            .group
-                            .id,
-                      ),
-                    ),
-                  );
-                  break;
-
-                case 2:
-                  final group = context
-                      .findAncestorWidgetOfExactType<GroupDetailScreen>()!
-                      .group;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ActivityScreen(
-                        groupId: group.id,
-                        groupName: group.name,
-                      ),
-                    ),
-                  );
-                  break;
-
-                case 3:
-                  // TODO: Navigate to Analytics
-                  break;
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primary.withOpacity(.1)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isActive ? item.activeIcon : item.icon,
-                    color: isActive ? AppColors.primary : Colors.grey.shade500,
-                    size: 24,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive
-                          ? AppColors.primary
-                          : Colors.grey.shade500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _NavItem {
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
-}
 
 // // ════════════════════════════════════════════════════════════════
 // // FILE: lib/features/group_detail/group_detail_screen.dart
