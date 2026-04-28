@@ -8,6 +8,7 @@ import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/providers/expense_provider.dart';
 import 'package:splitzon/providers/group_provider.dart';
 import 'package:splitzon/services/connectivity_service.dart';
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
 
 class SplashController {
   late AnimationController animationController;
@@ -40,6 +41,13 @@ class SplashController {
       context,
       listen: false,
     );
+    final activityController = Provider.of<ActivityController>(
+      context,
+      listen: false,
+    );
+
+    // ✅ LOAD ACTIVITIES FROM DATABASE ON APP STARTUP
+    await activityController.initialize();
 
     final isLoggedIn = await userProvider.initAuth(
       groupProvider,

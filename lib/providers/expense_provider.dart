@@ -285,6 +285,53 @@ class ExpenseProvider with ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────
+  // UPDATE EXPENSE
+  // ─────────────────────────────────────────────────────────
+
+  Future<bool> updateExpense(Expense updatedExpense) async {
+    _log('✏️ updateExpense(${updatedExpense.id})');
+    try {
+      // Step 1: Update local SQLite first
+      await _repo.updateExpense(updatedExpense.copyWith(syncStatus: 'PENDING'));
+
+      // Update in memory list
+      final groupId = updatedExpense.groupId;
+      final index =
+          _expensesByGroup[groupId]?.indexWhere(
+            (e) => e.id == updatedExpense.id,
+          ) ??
+          -1;
+      if (index != -1) {
+        _expensesByGroup[groupId]![index] = updatedExpense.copyWith(
+          syncStatus: 'PENDING',
+        );
+        notifyListeners();
+      }
+      _log('📱 Updated in SQLite + UI ✅');
+
+      // Step 2: Try backend if online
+      final online = await _isConnected();
+      if (online && _authToken != null && _sync != null) {
+        _log('🌐 Online — pushing update to backend...');
+        final ok = await _sync!.updateInBackend(updatedExpense, _authToken!);
+        if (ok) {
+          _log('✅ Updated successfully on backend');
+          await _syncFromBackend(groupId);
+        } else {
+          _log('⚠️ Backend update failed — stays PENDING');
+        }
+      } else {
+        _log('📴 Offline — expense stays PENDING, will auto-sync when online');
+      }
+
+      return true;
+    } catch (e) {
+      _err('updateExpense error: $e');
+      return false;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
   // DELETE EXPENSE
   // ─────────────────────────────────────────────────────────
 

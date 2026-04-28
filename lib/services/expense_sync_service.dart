@@ -58,10 +58,8 @@ class ExpenseSyncService {
           'notes': expense.notes,
           'date': expense.date.toIso8601String(),
           'splitType': expense.splitType,
-          'selectedMembers': expense.memberShares
-              .where((s) => s.isInvolved)
-              .map((s) => s.toMap())
-              .toList(),
+          // Backend reads req.body.memberShares — send ALL shares (involved + not involved)
+          'memberShares': expense.memberShares.map((s) => s.toMap()).toList(),
         }),
       );
 
@@ -176,6 +174,35 @@ class ExpenseSyncService {
     String authToken,
   ) async {
     return await _pushExpense(expense, authToken);
+  }
+
+  Future<bool> updateInBackend(Expense expense, String authToken) async {
+    try {
+      _log('Updating expense: ${expense.title}');
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/${expense.id}'),
+        headers: {
+          'Authorization': 'Bearer $authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'title': expense.title,
+          'amount': expense.amount,
+          'category': expense.category,
+          'notes': expense.notes,
+          'date': expense.date.toIso8601String(),
+          'splitType': expense.splitType,
+          // Backend reads req.body.memberShares — send ALL shares
+          'memberShares': expense.memberShares.map((s) => s.toMap()).toList(),
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      _err('Update error: $e');
+      return false;
+    }
   }
 
   Future<bool> deleteFromBackend(String expenseId, String authToken) async {

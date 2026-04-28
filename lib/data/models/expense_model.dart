@@ -21,8 +21,8 @@ class MemberShare {
   });
 
   factory MemberShare.fromMap(Map<String, dynamic> map) => MemberShare(
-    userId: map['userId'] ?? '',
-    name: map['name'] ?? '',
+    userId: (map['userId'] ?? '').toString(), // ← Force string
+    name: map['name']?.toString() ?? '',
     shareAmount: (map['shareAmount'] is num)
         ? (map['shareAmount'] as num).toDouble()
         : 0.0,
@@ -133,6 +133,9 @@ class Expense {
     'memberShares': jsonEncode(memberShares.map((s) => s.toMap()).toList()),
     'syncStatus': syncStatus,
   };
+
+  int get involvedCount =>
+      memberShares.where((s) => s.isInvolved == true).length;
 
   Expense copyWith({
     String? id,

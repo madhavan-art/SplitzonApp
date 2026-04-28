@@ -861,7 +861,12 @@ class _ExpenseCard extends StatelessWidget {
     final icon = _iconForCategory(expense.category);
     final iconColor = _iconColorForCategory(expense.category);
     final iconBg = _iconBgForCategory(expense.category);
-    final involved = expense.memberShares.where((s) => s.isInvolved).length;
+    // Top: how many members are involved in this split
+    // Bottom: total members in the expense's memberShares list
+    final involvedCount = expense.memberShares
+        .where((s) => s.isInvolved)
+        .length;
+    final totalMembersInExpense = expense.memberShares.length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -960,7 +965,7 @@ class _ExpenseCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '1/$involved SPLIT',
+                  '$involvedCount/$totalMembersInExpense SPLIT',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
