@@ -5,16 +5,26 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'add_expenses_controller.dart';
+import 'package:splitzon/data/models/expense_model.dart';
 import 'package:splitzon/data/models/group_model.dart';
 
 class AddExpenseScreen extends StatelessWidget {
   final Group group;
-  const AddExpenseScreen({super.key, required this.group});
+  final Expense? existingExpense; // ← For Edit Mode
+
+  const AddExpenseScreen({
+    super.key,
+    required this.group,
+    this.existingExpense,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AddExpenseController(group: group),
+      create: (_) => AddExpenseController(
+        group: group,
+        existingExpense: existingExpense, // ← Passed to controller
+      ),
       child: const _AddExpenseView(),
     );
   }
@@ -43,9 +53,9 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        title: const Text(
-          'Add Expense',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        title: Text(
+          c.isEditMode ? 'Edit Expense' : 'Add Expense',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
       ),
       body: SafeArea(
@@ -56,7 +66,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
             children: [
               const SizedBox(height: 16),
 
-              // ── AMOUNT ──────────────────────────────────────
+              // Amount Section
               Center(
                 child: Column(
                   children: [
@@ -109,7 +119,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
 
               const SizedBox(height: 20),
 
-              // ── TITLE ────────────────────────────────────────
+              // Title
               const Text(
                 'What was it for?',
                 style: TextStyle(
@@ -138,7 +148,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
 
               const SizedBox(height: 20),
 
-              // ── EXPENSE TYPE ─────────────────────────────────
+              // Expense Type
               const Text(
                 'Expense Type',
                 style: TextStyle(
@@ -149,16 +159,16 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  _typeChip(c, 'General'),
-                  _typeChip(c, 'Food'),
-                  _typeChip(c, 'Travel'),
-                  _typeChip(c, 'Shopping'),
-                ],
+                  'General',
+                  'Food',
+                  'Travel',
+                  'Shopping',
+                ].map((text) => _typeChip(c, text)).toList(),
               ),
 
               const SizedBox(height: 20),
 
-              // ── PAID BY ──────────────────────────────────────
+              // Paid By
               const Text(
                 'Paid by',
                 style: TextStyle(
@@ -187,7 +197,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
 
               const SizedBox(height: 20),
 
-              // ── SPLIT HEADER ─────────────────────────────────
+              // Split Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -221,7 +231,6 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
 
               const SizedBox(height: 12),
 
-              // ── SPLIT TYPE ───────────────────────────────────
               Row(
                 children: [
                   _splitChip(context, 'Equal', SplitType.equal),
@@ -232,7 +241,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
 
               const SizedBox(height: 14),
 
-              // ── SPLIT SUMMARY (percentage / custom) ──────────
+              // Split Summary
               Consumer<AddExpenseController>(
                 builder: (ctx, ctrl, _) {
                   if (ctrl.splitType == SplitType.percentage) {
@@ -280,7 +289,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
                 },
               ),
 
-              // ── MEMBERS LIST ─────────────────────────────────
+              // Members List
               Consumer<AddExpenseController>(
                 builder: (ctx, ctrl, _) => Column(
                   children: ctrl.members
@@ -291,12 +300,10 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
 
               const SizedBox(height: 16),
 
-              // ── SAVE BUTTON ──────────────────────────────────
+              // Save / Update Button
               Consumer<AddExpenseController>(
                 builder: (ctx, ctrl, _) {
                   final enabled = ctrl.canSave && !ctrl.isSaving;
-                  final hint = ctrl.validationHint;
-
                   return Column(
                     children: [
                       GestureDetector(
@@ -335,7 +342,9 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
                                     ),
                                   )
                                 : Text(
-                                    'Save Expense',
+                                    ctrl.isEditMode
+                                        ? 'Update Expense'
+                                        : 'Save Expense',
                                     style: TextStyle(
                                       color: enabled
                                           ? Colors.white
@@ -347,8 +356,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
                           ),
                         ),
                       ),
-                      // Validation hint below button
-                      if (hint.isNotEmpty) ...[
+                      if (ctrl.validationHint.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -361,7 +369,7 @@ class _AddExpenseViewState extends State<_AddExpenseView> {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                hint,
+                                ctrl.validationHint,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 11,
