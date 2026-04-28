@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/data/models/expense_model.dart';
 import 'package:splitzon/data/models/group_model.dart';
+import 'package:splitzon/features/commentActivity/activity_controller.dart';
 import 'package:splitzon/providers/expense_provider.dart';
 import 'add_expenses_screen.dart';
 
@@ -112,6 +113,16 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
 
     if (result != null && mounted) {
       setState(() => _expense = result);
+
+      // // Log activity for update
+      // final activityController = context.read<ActivityController>();
+      // await activityController.logExpenseUpdated(
+      //   result.title,
+      //   widget.group.id,
+      //   widget.group.name,
+      //   result.paidByName,
+      // );
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Expense updated successfully'),
@@ -165,6 +176,16 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
     setState(() => _isDeleting = false);
 
     if (ok) {
+      // Log activity for delete
+      final activityController = context.read<ActivityController>();
+      await activityController.logExpenseDeleted(
+        _expense.title,
+        widget.group.id,
+        widget.group.name,
+        _expense.paidByName,
+      );
+
+      // Navigator.pop(context, true); // Return deleted signal
       if (mounted) Navigator.pop(context, true); // Return true = deleted
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

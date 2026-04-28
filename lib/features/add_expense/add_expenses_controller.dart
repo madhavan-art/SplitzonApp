@@ -235,6 +235,7 @@ class AddExpenseController extends ChangeNotifier {
 
     try {
       final expenseProvider = context.read<ExpenseProvider>();
+      final activityController = context.read<ActivityController>();
 
       Expense? result;
 
@@ -248,6 +249,15 @@ class AddExpenseController extends ChangeNotifier {
           memberShares: shares,
         );
         result = await expenseProvider.updateExpense(updatedExpense);
+
+        if (result != null) {
+          await activityController.logExpenseUpdated(
+            result.title,
+            group.id,
+            group.name,
+            result.paidByName,
+          );
+        }
       } else {
         // Create new expense
         result = await expenseProvider.createExpense(
@@ -260,6 +270,16 @@ class AddExpenseController extends ChangeNotifier {
           splitType: _mapSplitType(splitType),
           memberShares: shares,
         );
+
+        if (result != null) {
+          await activityController.logExpenseAdded(
+            result.title,
+            group.id,
+            group.name,
+            paidByName,
+            totalAmount,
+          );
+        }
       }
 
       isSaving = false;
@@ -282,6 +302,7 @@ class AddExpenseController extends ChangeNotifier {
     } catch (e) {
       isSaving = false;
       notifyListeners();
+      _log('❌ ERROR: $e');
       _snack(
         context,
         'Failed to ${isEditMode ? "update" : "save"} expense: $e',
