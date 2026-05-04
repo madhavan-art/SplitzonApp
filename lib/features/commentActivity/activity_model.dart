@@ -1,3 +1,7 @@
+// ════════════════════════════════════════════════════════════════
+// FILE: lib/features/commentActivity/activity_model.dart
+// ════════════════════════════════════════════════════════════════
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
@@ -12,6 +16,7 @@ class ActivityModel {
   final String userName;
   final DateTime timestamp;
   final Map<String, dynamic>? metadata;
+  final String syncStatus; // ← NEW: 'PENDING', 'SYNCED', 'PENDING_DELETE'
 
   ActivityModel({
     required this.id,
@@ -24,8 +29,10 @@ class ActivityModel {
     required this.userName,
     required this.timestamp,
     this.metadata,
+    this.syncStatus = 'PENDING', // Default to PENDING for offline-first
   });
 
+  // Convert to SQLite Map
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -38,9 +45,11 @@ class ActivityModel {
       'userName': userName,
       'timestamp': timestamp.toIso8601String(),
       'metadata': metadata != null ? jsonEncode(metadata) : null,
+      'syncStatus': syncStatus, // ← Added
     };
   }
 
+  // Convert from SQLite Map
   factory ActivityModel.fromMap(Map<String, dynamic> map) {
     dynamic metadataValue = map['metadata'];
     Map<String, dynamic>? parsedMetadata;
@@ -48,17 +57,13 @@ class ActivityModel {
     try {
       if (metadataValue != null) {
         if (metadataValue is String) {
-          // Proper JSON string - decode it
           parsedMetadata = jsonDecode(metadataValue);
         } else if (metadataValue is Map) {
-          // Already a Map (rare case)
           parsedMetadata = Map<String, dynamic>.from(metadataValue);
         }
       }
     } catch (e) {
-      debugPrint(
-        '⚠️  Metadata parse failed, ignoring: $metadataValue | Error: $e',
-      );
+      debugPrint('⚠️ Metadata parse failed: $e');
       parsedMetadata = null;
     }
 
@@ -71,11 +76,15 @@ class ActivityModel {
       groupName: map['groupName'] ?? '',
       userId: map['userId'] ?? '',
       userName: map['userName'] ?? '',
-      timestamp: DateTime.parse(map['timestamp']),
+      timestamp: DateTime.parse(
+        map['timestamp'] ?? DateTime.now().toIso8601String(),
+      ),
       metadata: parsedMetadata,
+      syncStatus: map['syncStatus'] ?? 'PENDING', // ← Added
     );
   }
 
+  // Copy with method for updating syncStatus
   ActivityModel copyWith({
     String? id,
     String? type,
@@ -87,6 +96,7 @@ class ActivityModel {
     String? userName,
     DateTime? timestamp,
     Map<String, dynamic>? metadata,
+    String? syncStatus,
   }) {
     return ActivityModel(
       id: id ?? this.id,
@@ -99,6 +109,14 @@ class ActivityModel {
       userName: userName ?? this.userName,
       timestamp: timestamp ?? this.timestamp,
       metadata: metadata ?? this.metadata,
+      syncStatus: syncStatus ?? this.syncStatus,
     );
   }
+
+  // Helper to check if activity is synced
+  bool get isSynced => syncStatus == 'SYNCED';
+
+  // Helper to check if activity needs syncing
+  bool get isPending =>
+      syncStatus == 'PENDING' || syncStatus == 'PENDING_DELETE';
 }

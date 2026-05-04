@@ -940,6 +940,7 @@ import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/core/utils/background_main_theme.dart';
 import 'package:splitzon/features/Profile_page/profile_screen.dart';
 import 'package:splitzon/features/add_group/add_group_screen.dart';
+import 'package:splitzon/features/analytics_page/analytics_screen.dart';
 import 'package:splitzon/features/gorup_dashboard/grp_dashboard_screen.dart';
 import 'package:splitzon/features/home/balance_card.dart';
 import 'package:splitzon/features/commentActivity/activity_screen.dart';
@@ -1055,7 +1056,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Activity Page
           const ActivityScreen(),
           // Analytics Page
-          _buildAnalyticsPage(),
+          // _buildAnalyticsPage(),
+          const AnalyticsScreen(title: "Global Analytics"),
+
           // Profile Page
           const ProfileScreen(),
         ];

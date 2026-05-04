@@ -5,20 +5,26 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:splitzon/core/constants/app_colors.dart';
 import 'package:splitzon/data/models/expense_model.dart';
 import 'package:splitzon/data/models/group_model.dart';
+
 import 'package:splitzon/features/Add_members/add_members_screen.dart';
 import 'package:splitzon/features/add_expense/add_expenses_screen.dart';
 import 'package:splitzon/features/add_expense/expense_detail_screen.dart';
+import 'package:splitzon/features/analytics_page/analytics_screen.dart';
+import 'package:splitzon/features/commentActivity/activity_screen.dart';
+import 'package:splitzon/features/gorup_dashboard/GroupBalancesScreen.dart';
+import 'package:splitzon/features/gorup_dashboard/group_settings_screen.dart';
 import 'package:splitzon/features/gorup_dashboard/grp_dashboard_controller.dart';
+
 import 'package:splitzon/provider/user_providers.dart';
 import 'package:splitzon/providers/expense_provider.dart';
-import 'package:splitzon/features/commentActivity/activity_screen.dart';
-import 'package:splitzon/features/gorup_dashboard/group_settings_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final Group group;
+
   const GroupDetailScreen({super.key, required this.group});
 
   @override
@@ -30,8 +36,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   late AnimationController _animCtrl;
   late Animation<double> _fade;
   late Animation<Offset> _slide;
+
+  int _currentTab =
+      0; // 0: Dashboard, 1: Members, 2: Activity, 3: Analytics, 4: Balances
+
   late GroupDetailController _ctrl;
-  int _currentTab = 0;
 
   @override
   void initState() {
@@ -49,14 +58,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
     _animCtrl.forward();
 
-    // Build controller with current user id
     final currentUserId = context.read<UserProviders>().user?.id ?? '';
     _ctrl = GroupDetailController(
       group: widget.group,
       currentUserId: currentUserId,
     );
 
-    // Load expenses from provider
+    // Load expenses safely
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ExpenseProvider>().loadExpenses(widget.group.id);
     });
@@ -69,180 +77,24 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     super.dispose();
   }
 
-  // @override
-  // Widget build(BuildContext context) {
-  //   final sw = MediaQuery.of(context).size.width;
-  //   final hPad = sw * 0.05;
+  void _onTabChanged(int index) {
+    setState(() => _currentTab = index);
+  }
 
-  //   // Sync expense provider data into controller
-  //   final expenseProvider = context.watch<ExpenseProvider>();
-  //   final expenses = expenseProvider.getExpenses(widget.group.id);
-  //   _ctrl.setExpenses(expenses);
-
-  //   return Scaffold(
-  //     backgroundColor: const Color(0xFFF5F8FF),
-  //     bottomNavigationBar: const GroupDetailBottomBar(),
-  //     body: FadeTransition(
-  //       opacity: _fade,
-  //       child: SlideTransition(
-  //         position: _slide,
-  //         child: RefreshIndicator(
-  //           onRefresh: () =>
-  //               context.read<ExpenseProvider>().loadExpenses(widget.group.id),
-  //           color: AppColors.primary,
-  //           child: CustomScrollView(
-  //             slivers: [
-  //               SliverToBoxAdapter(child: _buildTopBar()),
-  //               SliverToBoxAdapter(
-  //                 child: Padding(
-  //                   padding: EdgeInsets.symmetric(horizontal: hPad),
-  //                   child: _HeroBannerCard(
-  //                     group: widget.group,
-  //                     totalExpenses: _ctrl.totalExpenses,
-  //                     symbol: _ctrl.symbol,
-  //                   ),
-  //                 ),
-  //               ),
-  //               SliverToBoxAdapter(
-  //                 child: expenseProvider.isLoading(widget.group.id)
-  //                     ? const SizedBox(
-  //                         height: 200,
-  //                         child: Center(
-  //                           child: CircularProgressIndicator(
-  //                             color: AppColors.primary,
-  //                           ),
-  //                         ),
-  //                       )
-  //                     : Padding(
-  //                         padding: EdgeInsets.symmetric(horizontal: hPad),
-  //                         child: Column(
-  //                           crossAxisAlignment: CrossAxisAlignment.start,
-  //                           children: [
-  //                             const SizedBox(height: 20),
-  //                             _CombinedStatusCard(ctrl: _ctrl),
-  //                             const SizedBox(height: 24),
-  //                             _ExpensesHeader(onViewAll: () {}),
-  //                             const SizedBox(height: 14),
-  //                             if (expenses.isEmpty)
-  //                               _EmptyExpenses()
-  //                             else
-  //                               ...expenses.map(
-  //                                 (e) => _ExpenseCard(
-  //                                   expense: e,
-  //                                   symbol: _ctrl.symbol,
-  //                                 ),
-  //                               ),
-  //                             const SizedBox(height: 120),
-  //                           ],
-  //                         ),
-  //                       ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //     floatingActionButton: FloatingActionButton(
-  //       backgroundColor: AppColors.primary,
-  //       foregroundColor: Colors.white,
-  //       onPressed: () async {
-  //         await Navigator.push(
-  //           context,
-  //           MaterialPageRoute(
-  //             builder: (_) => AddExpenseScreen(group: widget.group),
-  //           ),
-  //         );
-  //         // Refresh after returning from add expense screen
-  //         if (mounted) {
-  //           context.read<ExpenseProvider>().loadExpenses(widget.group.id);
-  //         }
-  //       },
-  //       child: const Icon(Icons.add_rounded),
-  //     ),
-  //   );
-  // }
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final hPad = sw * 0.05;
-
+    // Watch expenseProvider once here
     final expenseProvider = context.watch<ExpenseProvider>();
     final expenses = expenseProvider.getExpenses(widget.group.id);
     _ctrl.setExpenses(expenses);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FF),
-      bottomNavigationBar: _buildBottomNav(),
       body: IndexedStack(
         index: _currentTab,
         children: [
           // 0 - Dashboard
-          FadeTransition(
-            opacity: _fade,
-            child: SlideTransition(
-              position: _slide,
-              child: RefreshIndicator(
-                onRefresh: () => context.read<ExpenseProvider>().loadExpenses(
-                  widget.group.id,
-                ),
-                color: AppColors.primary,
-                child: CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(child: _buildTopBar()),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: hPad),
-                        child: _HeroBannerCard(
-                          group: widget.group,
-                          totalExpenses: _ctrl.totalExpenses,
-                          symbol: _ctrl.symbol,
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: expenseProvider.isLoading(widget.group.id)
-                          ? const SizedBox(
-                              height: 200,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            )
-                          : Padding(
-                              padding: EdgeInsets.symmetric(horizontal: hPad),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 20),
-                                  _CombinedStatusCard(ctrl: _ctrl),
-                                  const SizedBox(height: 24),
-                                  _ExpensesHeader(onViewAll: () {}),
-                                  const SizedBox(height: 14),
-                                  if (expenses.isEmpty)
-                                    _EmptyExpenses()
-                                  else
-                                    ...expenses
-                                        .map(
-                                          (e) => _ExpenseCard(
-                                            expense: e,
-                                            symbol: _ctrl.symbol,
-                                            totalGroupMembers:
-                                                widget.group.members.length,
-                                            group: widget.group,
-                                          ),
-                                        )
-                                        .toList(),
-                                  const SizedBox(height: 120),
-                                ],
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          _buildDashboardTab(expenses, expenseProvider),
 
           // 1 - Add Members
           AddMembersScreen(groupId: widget.group.id),
@@ -253,23 +105,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             groupName: widget.group.name,
           ),
 
-          // 3 - Analytics placeholder
-          const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'Analytics\nComing Soon',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
-                ),
-              ],
-            ),
+          // 3 - Analytics
+          AnalyticsScreen(
+            title: "${widget.group.name} Analytics",
+            groupId: widget.group.id,
           ),
+
+          // 4 - Balances & Settlements
+          GroupBalancesScreen(group: widget.group),
         ],
       ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
       floatingActionButton: _currentTab == 0
           ? FloatingActionButton(
               backgroundColor: AppColors.primary,
@@ -291,146 +137,111 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 
-  Widget _buildBottomNav() {
-    final items = [
-      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'Dashboard'),
-      (Icons.people_outline_rounded, Icons.people_rounded, 'Members'),
-      (
-        Icons.access_time_outlined,
-        Icons.access_time_filled_rounded,
-        'Activity',
-      ),
-      (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Analytics'),
-    ];
+  // Dashboard Tab
+  Widget _buildDashboardTab(
+    List<Expense> expenses,
+    ExpenseProvider expenseProvider,
+  ) {
+    final sw = MediaQuery.of(context).size.width;
+    final hPad = sw * 0.05;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primary.withOpacity(.12), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(.10),
-            blurRadius: 16,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(items.length, (i) {
-          final isActive = _currentTab == i;
-          final item = items[i];
-
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _currentTab = i),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? AppColors.primary.withOpacity(.1)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isActive ? item.$2 : item.$1,
-                      color: isActive
-                          ? AppColors.primary
-                          : Colors.grey.shade400,
-                      size: 20, // ← smaller icon
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.$3,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 9.5, // ← smaller label
-                        fontWeight: isActive
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                        color: isActive
-                            ? AppColors.primary
-                            : Colors.grey.shade400,
-                      ),
-                    ),
-                  ],
-                ),
+    return RefreshIndicator(
+      onRefresh: () =>
+          context.read<ExpenseProvider>().loadExpenses(widget.group.id),
+      color: AppColors.primary,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildTopBar()),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              child: _HeroBannerCard(
+                group: widget.group,
+                totalExpenses: expenses.fold(0.0, (sum, e) => sum + e.amount),
+                symbol: "₹",
               ),
             ),
-          );
-        }),
+          ),
+          SliverToBoxAdapter(
+            child: expenseProvider.isLoading(widget.group.id)
+                ? const SizedBox(
+                    height: 200,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : Padding(
+                    padding: EdgeInsets.symmetric(horizontal: hPad),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        _CombinedStatusCard(ctrl: _ctrl),
+                        const SizedBox(height: 24),
+                        _ExpensesHeader(onViewAll: () {}),
+                        const SizedBox(height: 14),
+                        if (expenses.isEmpty)
+                          _EmptyExpenses()
+                        else
+                          ...expenses.map(
+                            (e) => _ExpenseCard(
+                              expense: e,
+                              symbol: "₹",
+                              totalGroupMembers: widget.group.members.length,
+                              group: widget.group,
+                            ),
+                          ),
+                        const SizedBox(height: 120),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
 
-  // ── TOP BAR ────────────────────────────────────────────────
-  Widget _buildTopBar() => Container(
-    color: Colors.white,
-    child: SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 44,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
+  Widget _buildTopBar() {
+    return Container(
+      color: Colors.white,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  widget.group.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     color: AppColors.primary,
-                    size: 18,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
               ),
-            ),
-            Expanded(
-              child: Text(
-                widget.group.name,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            SizedBox(
-              width: 44,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+              SizedBox(
+                width: 44,
                 child: IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
                   icon: const Icon(
                     Icons.settings_rounded,
                     color: AppColors.primary,
@@ -447,16 +258,82 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    const navItems = [
+      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'Dashboard'),
+      (Icons.people_outline_rounded, Icons.people_rounded, 'Members'),
+      (Icons.history_outlined, Icons.history_rounded, 'Activity'),
+      (Icons.analytics_outlined, Icons.analytics_rounded, 'Analytics'),
+      (
+        Icons.account_balance_wallet_outlined,
+        Icons.account_balance_wallet_rounded,
+        'Balances',
+      ),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(navItems.length, (i) {
+          final isActive = _currentTab == i;
+          final item = navItems[i];
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _currentTab = i),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isActive ? item.$2 : item.$1,
+                    color: isActive ? AppColors.primary : Colors.grey.shade500,
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.$3,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive
+                          ? AppColors.primary
+                          : Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
 }
 
+// Keep all your helper widgets (_HeroBannerCard, _MemberAvatarOverflow, _CombinedStatusCard, _BalanceRow, _Avatar, _ExpensesHeader, _EmptyExpenses, _ExpenseCard, etc.) unchanged below this point.
+
 // ════════════════════════════════════════════════════════════════
-// HERO BANNER CARD
+// HERO BANNER CARD (Unchanged from your original)
 // ════════════════════════════════════════════════════════════════
 
 class _HeroBannerCard extends StatelessWidget {
@@ -599,7 +476,6 @@ class _HeroBannerCard extends StatelessWidget {
   }
 
   Widget _background() {
-    // ALWAYS SHOW GROUP LETTER FIRST
     final letterWidget = Center(
       child: Text(
         group.name.isNotEmpty ? group.name[0].toUpperCase() : '?',
@@ -631,11 +507,12 @@ class _HeroBannerCard extends StatelessWidget {
         ],
       );
     }
-
-    // No banner: show only letter
     return letterWidget;
   }
 }
+
+// Keep all your other widgets (_MemberAvatarOverflow, _CombinedStatusCard, _BalanceRow, _Avatar, _ExpensesHeader, _EmptyExpenses, _ExpenseCard, etc.) unchanged below this point.
+// Paste them from your original file if they are not already included.
 
 class _MemberAvatarOverflow extends StatelessWidget {
   final Group group;
@@ -658,17 +535,6 @@ class _MemberAvatarOverflow extends StatelessWidget {
     final show = group.members.length > 4 ? 4 : group.members.length;
     final total = group.members.length;
 
-    // ✅ DEBUG LOGS: Print member data to console
-    print('══════════════════════════════════════════');
-    print('✅ GROUP MEMBER DATA DEBUG:');
-    print('Group: ${group.name} | Members count: ${group.members.length}');
-    for (int m = 0; m < group.members.length; m++) {
-      print(
-        '  Member [$m]: ${group.members[m].name} | length: ${group.members[m].name.length} | first char: ${group.members[m].name.isNotEmpty ? group.members[m].name[0] : "empty"}',
-      );
-    }
-    print('══════════════════════════════════════════');
-
     return Row(
       children: List.generate(show, (i) {
         return Transform.translate(
@@ -684,10 +550,6 @@ class _MemberAvatarOverflow extends StatelessWidget {
             child: CircleAvatar(
               radius: avatarRadius,
               backgroundColor: _colors[i % _colors.length].withOpacity(0.85),
-              // ✅ Proper Avatar Logic:
-              // 1. Check if user has profile photo - show image
-              // 2. Otherwise show first letter of name always
-              backgroundImage: null, // add your profile image check here
               child: (total > 4 && i == 3)
                   ? Text(
                       '+${total - 3}',
@@ -715,6 +577,7 @@ class _MemberAvatarOverflow extends StatelessWidget {
   }
 }
 
+// Paste the rest of your helper widgets (_CombinedStatusCard, _BalanceRow, _Avatar, _ExpensesHeader, _EmptyExpenses, _ExpenseCard, etc.) here unchanged.
 // ════════════════════════════════════════════════════════════════
 // COMBINED STATUS CARD (Your Status + Balances + Settle)
 // ════════════════════════════════════════════════════════════════

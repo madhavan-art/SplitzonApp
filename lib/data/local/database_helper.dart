@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import 'package:flutter/foundation.dart';
+import 'package:splitzon/data/models/settlement_model.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../model/user.dart';
@@ -26,7 +27,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 8, // ← bumped to 8 for bannerPublicId column
+      version: 10, // ← bumped to 8 for bannerPublicId column
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -100,6 +101,22 @@ class DatabaseHelper {
         metadata TEXT
       )
     ''');
+
+    // SETTLEMENTS TABLE - NEW
+    await db.execute('''
+    CREATE TABLE settlements (
+      id TEXT PRIMARY KEY,
+      groupId TEXT NOT NULL,
+      fromUserId TEXT NOT NULL,
+      fromUserName TEXT NOT NULL,
+      toUserId TEXT NOT NULL,
+      toUserName TEXT NOT NULL,
+      amount REAL NOT NULL,
+      notes TEXT DEFAULT "",
+      date TEXT NOT NULL,
+      syncStatus TEXT NOT NULL DEFAULT "PENDING"
+    )
+  ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -211,6 +228,28 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE groups ADD COLUMN bannerPublicId TEXT DEFAULT ""',
       );
+    }
+    if (oldVersion < 9) {
+      await db.execute(
+        'ALTER TABLE activities ADD COLUMN syncStatus TEXT NOT NULL DEFAULT "PENDING"',
+      );
+    }
+    // Version 10: Settlements Table
+    if (oldVersion < 10) {
+      await db.execute('''
+      CREATE TABLE IF NOT EXISTS settlements (
+        id TEXT PRIMARY KEY,
+        groupId TEXT NOT NULL,
+        fromUserId TEXT NOT NULL,
+        fromUserName TEXT NOT NULL,
+        toUserId TEXT NOT NULL,
+        toUserName TEXT NOT NULL,
+        amount REAL NOT NULL,
+        notes TEXT DEFAULT "",
+        date TEXT NOT NULL,
+        syncStatus TEXT NOT NULL DEFAULT "PENDING"
+      )
+    ''');
     }
   }
 
@@ -417,177 +456,57 @@ class DatabaseHelper {
     final db = await database;
     db.close();
   }
+
+  // ====================== SETTLEMENT METHODS ======================
+
+  /// Insert a new settlement
+  Future<Settlement> insertSettlement(Settlement settlement) async {
+    final db = await database;
+    await db.insert(
+      'settlements',
+      settlement.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    return settlement;
+  }
+
+  /// Get all settlements for a specific group
+  Future<List<Settlement>> getSettlementsByGroup(String groupId) async {
+    final db = await database;
+    final maps = await db.query(
+      'settlements',
+      where: 'groupId = ?',
+      whereArgs: [groupId],
+      orderBy: 'date DESC',
+    );
+    return maps.map((m) => Settlement.fromMap(m)).toList();
+  }
+
+  /// Get all pending settlements (for sync)
+  Future<List<Settlement>> getPendingSettlements() async {
+    final db = await database;
+    final maps = await db.query(
+      'settlements',
+      where: 'syncStatus = ?',
+      whereArgs: ['PENDING'],
+    );
+    return maps.map((m) => Settlement.fromMap(m)).toList();
+  }
+
+  /// Mark a settlement as synced after successful backend sync
+  Future<int> markSettlementAsSynced(String id) async {
+    final db = await database;
+    return await db.update(
+      'settlements',
+      {'syncStatus': 'SYNCED'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Delete a settlement (optional)
+  Future<int> deleteSettlement(String id) async {
+    final db = await database;
+    return await db.delete('settlements', where: 'id = ?', whereArgs: [id]);
+  }
 }
-
-
-// import 'package:sqflite/sqflite.dart';
-// import 'package:path/path.dart';
-// import '../models/group_model.dart';
-
-// class DatabaseHelper {
-//   static final DatabaseHelper instance = DatabaseHelper._init();
-//   static Database? _database;
-
-//   DatabaseHelper._init();
-
-//   Future<Database> get database async {
-//     if (_database != null) return _database!;
-//     _database = await _initDB('splitzon.db');
-//     return _database!;
-//   }
-
-//   Future<Database> _initDB(String filePath) async {
-//     final dbPath = await getDatabasesPath();
-//     final path = join(dbPath, filePath);
-
-//     return await openDatabase(
-//       path,
-//       version: 3,
-//       onCreate: _createDB,
-//       onUpgrade: _upgradeDB,
-//     );
-//   }
-
-//   Future<void> debugPrintAllGroups() async {
-//     final db = await database;
-
-//     final rows = await db.query('groups');
-
-//     print("===== SQLITE GROUPS DEBUG =====");
-
-//     if (rows.isEmpty) {
-//       print("No groups in SQLite");
-//       return;
-//     }
-
-//     for (final row in rows) {
-//       print("ID: ${row['id']}");
-//       print("userId: ${row['userId']}");
-//       print("name: ${row['name']}");
-//       print("syncStatus: ${row['syncStatus']}");
-//       print("----------------------------");
-//     }
-//   }
-
-//   Future<void> _createDB(Database db, int version) async {
-//     await db.execute('''
-//       CREATE TABLE groups (
-//         id TEXT PRIMARY KEY,
-//         userId TEXT NOT NULL DEFAULT "",
-//         name TEXT NOT NULL,
-//         description TEXT DEFAULT "",
-//         groupType TEXT DEFAULT "Other",
-//         currency TEXT DEFAULT "INR",
-//         overallBudget REAL DEFAULT 0.0,
-//         myShare REAL DEFAULT 0.0,
-//         members TEXT NOT NULL,
-//         createdBy TEXT DEFAULT "",
-//         bannerImagePath TEXT DEFAULT "",
-//         bannerImageUrl TEXT DEFAULT "",
-//         createdAt TEXT NOT NULL,
-//         syncStatus TEXT NOT NULL
-//       )
-//     ''');
-//   }
-
-//   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-//     if (oldVersion < 2) {
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN description TEXT DEFAULT ""',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN groupType TEXT DEFAULT "Other"',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN currency TEXT DEFAULT "INR"',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN overallBudget REAL DEFAULT 0.0',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN myShare REAL DEFAULT 0.0',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN createdBy TEXT DEFAULT ""',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN bannerImagePath TEXT DEFAULT ""',
-//       );
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN bannerImageUrl TEXT DEFAULT ""',
-//       );
-//     }
-//     if (oldVersion < 3) {
-//       await db.execute(
-//         'ALTER TABLE groups ADD COLUMN userId TEXT NOT NULL DEFAULT ""',
-//       );
-//     }
-//   }
-
-//   // ── INSERT (new group) ────────────────────────────────────
-//   Future<Group> insertGroup(Group group) async {
-//     final db = await database;
-//     await db.insert(
-//       'groups',
-//       group.toMap(),
-//       conflictAlgorithm: ConflictAlgorithm.ignore, // skip if id already exists
-//     );
-//     return group;
-//   }
-
-//   // ── INSERT OR REPLACE ─────────────────────────────────────
-//   // ✅ This is what fetchAndSyncGroups should use.
-//   // If the group already exists → update it.
-//   // If it doesn't exist yet    → insert it.
-//   // This is why 2 backend groups were becoming 1 — updateGroup
-//   // was silently doing nothing for rows that didn't exist yet.
-//   Future<void> insertOrUpdateGroup(Group group) async {
-//     final db = await database;
-//     await db.insert(
-//       'groups',
-//       group.toMap(),
-//       conflictAlgorithm: ConflictAlgorithm.replace, // ← insert OR update
-//     );
-//   }
-
-//   // ── GET ALL GROUPS FOR A USER ─────────────────────────────
-//   Future<List<Group>> getGroupsByUser(String userId) async {
-//     final db = await database;
-//     final maps = await db.query(
-//       'groups',
-//       where: 'userId = ?',
-//       whereArgs: [userId],
-//       orderBy: 'createdAt DESC',
-//     );
-//     return maps.map((map) => Group.fromMap(map)).toList();
-//   }
-
-//   // ── UPDATE (existing group only) ──────────────────────────
-//   Future<int> updateGroup(Group group) async {
-//     final db = await database;
-//     return db.update(
-//       'groups',
-//       group.toMap(),
-//       where: 'id = ?',
-//       whereArgs: [group.id],
-//     );
-//   }
-
-//   // ── DELETE ONE ────────────────────────────────────────────
-//   Future<int> deleteGroup(String id) async {
-//     final db = await database;
-//     return db.delete('groups', where: 'id = ?', whereArgs: [id]);
-//   }
-
-//   // ── DELETE ALL FOR USER ───────────────────────────────────
-//   Future<void> deleteAllGroupsForUser(String userId) async {
-//     final db = await database;
-//     await db.delete('groups', where: 'userId = ?', whereArgs: [userId]);
-//   }
-
-//   Future close() async {
-//     final db = await database;
-//     db.close();
-//   }
-// }
-
